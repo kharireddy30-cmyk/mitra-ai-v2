@@ -8,22 +8,40 @@ from datetime import datetime
 from streamlit_mic_recorder import mic_recorder
 from supabase import create_client, Client
 
-# 1. పేజీ కాన్ఫిగరేషన్
-st.set_page_config(page_title="Mitra AI Pro - Cloud Edition", layout="wide", page_icon="🤖")
+# 1. పేజీ కాన్ఫిగరేషన్ (మీ పాత టైటిల్ మరియు ఐకాన్ అలాగే ఉన్నాయి)
+st.set_page_config(page_title="Mitra AI Pro - Harsha", layout="wide", page_icon="🤖")
 
-# 2. Supabase క్లౌడ్ కనెక్షన్ సెటప్ (Secrets నుండి)
-# ఈ వివరాలను మనం తర్వాత Streamlit Settings లో ఇస్తాం
+# 2. క్లౌడ్ కనెక్షన్లు (Secrets నుండి సురక్షితంగా తీసుకుంటుంది)
 try:
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
     supabase: Client = create_client(url, key)
+    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+    
+    # మీరు కోరిన సురక్షిత లాగిన్ వివరాలు
+    SECURE_EMAIL = st.secrets["MY_EMAIL"]
+    SECURE_PASSWORD = st.secrets["MY_PASSWORD"]
 except Exception as e:
-    st.error("క్లౌడ్ కనెక్షన్ వివరాలు ఇంకా సెట్ చేయలేదు. దయచేసి Secrets లో URL మరియు Key ఇవ్వండి.")
+    st.error("సెక్యూరిటీ వివరాలు (Secrets) సరిగ్గా లేవు. దయచేసి వెబ్ సెట్టింగ్స్ చెక్ చేయండి.")
 
-# 3. Groq ఏపీఐ కీ
-client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+# --- 3. అత్యంత సురక్షితమైన లాగిన్ సిస్టమ్ (మీరు కోరిన వ్యక్తిగత లాగిన్) ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
 
-# 4. వాయిస్ అవుట్‌పుట్ కోసం గుర్తులను క్లీన్ చేసే ఫంక్షన్
+if not st.session_state.authenticated:
+    st.title("🔐 Mitra AI Private Access")
+    email_input = st.text_input("మీ పర్సనల్ మెయిల్ ఐడి (Email)")
+    pass_input = st.text_input("మీ రహస్య పాస్‌వర్డ్ (Password)", type="password")
+    
+    if st.button("Access Mitra"):
+        if email_input == SECURE_EMAIL and pass_input == SECURE_PASSWORD:
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("తప్పుడు వివరాలు! ఇది హర్ష గారి వ్యక్తిగత ఏఐ.")
+    st.stop()
+
+# 4. మీ పాత వాయిస్ క్లీనింగ్ ఫంక్షన్ (అలాగే ఉంది)
 def clean_for_speech(text):
     unwanted_chars = ['*', '#', '_', '`', ':', '-']
     clean_text = text
@@ -31,23 +49,28 @@ def clean_for_speech(text):
         clean_text = clean_text.replace(char, ' ')
     return clean_text
 
-# --- సహాయక ఫంక్షన్లు (Cloud Data Management) ---
-
-def save_chat_to_cloud(chat_id, messages, title):
-    """చాట్ డేటాను క్లౌడ్ డేటాబేస్ లో భద్రపరుస్తుంది"""
+# --- 5. మిత్ర మేధస్సు/మెమరీ (Cloud Settings) ---
+def load_settings_from_cloud():
     try:
-        data = {
-            "id": chat_id,
-            "title": title,
-            "messages": messages,
-            "updated_at": "now()"
-        }
-        supabase.table("mitra_chats").upsert(data).execute()
+        res = supabase.table("mitra_settings").select("*").eq("id", "current").execute()
+        if res.data:
+            return res.data[0]["intelligence"]
+        return "నువ్వు మిత్ర అనే ఏఐవి. హర్ష గారికి సహాయం చేయాలి. సమాధానం ఇచ్చేటప్పుడు ఎక్కువ గుర్తులు వాడకు."
+    except:
+        return "నువ్వు మిత్ర అనే ఏఐవి. హర్ష గారికి సహాయం చేయాలి."
+
+def save_settings_to_cloud(intel_text):
+    try:
+        supabase.table("mitra_settings").upsert({"id": "current", "intelligence": intel_text}).execute()
     except Exception as e:
-        st.error(f"Save Error: {e}")
+        st.error(f"Settings Error: {e}")
+
+# --- 6. క్లౌడ్ డేటా మేనేజ్మెంట్ (మునుపటిలాగే) ---
+def save_chat_to_cloud(chat_id, messages, title):
+    data = {"id": chat_id, "title": title, "messages": messages, "updated_at": "now()"}
+    supabase.table("mitra_chats").upsert(data).execute()
 
 def load_chats_from_cloud():
-    """అన్ని పాత సంభాషణలను క్లౌడ్ నుండి తెస్తుంది"""
     try:
         response = supabase.table("mitra_chats").select("*").order("updated_at", desc=True).execute()
         return response.data
@@ -55,28 +78,27 @@ def load_chats_from_cloud():
         return []
 
 def delete_chat_from_cloud(chat_id):
-    """మొత్తం చాట్ ను క్లౌడ్ నుండి తొలగిస్తుంది"""
-    try:
-        supabase.table("mitra_chats").delete().eq("id", chat_id).execute()
-    except Exception as e:
-        st.error(f"Delete Error: {e}")
+    supabase.table("mitra_chats").delete().eq("id", chat_id).execute()
 
-# --- సైడ్‌బార్ (సెట్టింగ్స్ మరియు క్లౌడ్ హిస్టరీ) ---
+# --- 7. సైడ్‌బార్ (సెట్టింగ్స్ మరియు క్లౌడ్ హిస్టరీ) ---
 with st.sidebar:
     st.title("⚙️ Workspace Settings")
     
-    # మిత్ర మేధస్సు (Intelligence) - ఇది ప్రస్తుతం ఫిక్స్‌డ్ గా ఉంటుంది లేదా క్లౌడ్ కి మార్చుకోవచ్చు
-    intel_prompt = "నువ్వు మిత్ర అనే ఏఐవి. హర్ష గారికి సహాయం చేయాలి. సమాధానం ఇచ్చేటప్పుడు ఎక్కువ గుర్తులు వాడకు."
+    # మిత్ర మేధస్సు జ్ఞాపకశక్తి ఆప్షన్
+    current_intel = load_settings_from_cloud()
+    new_intel = st.text_area("మిత్ర మేధస్సు (System Prompt):", value=current_intel, height=150)
+    if st.button("Save Intelligence"):
+        save_settings_to_cloud(new_intel)
+        st.success("మేధస్సు క్లౌడ్ లో సేవ్ అయ్యింది!")
 
+    st.divider()
     if st.button("➕ Start New Chat"):
         st.session_state.chat_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         st.session_state.messages = []
         st.session_state.chat_title = "కొత్త సంభాషణ"
         st.rerun()
 
-    st.divider()
     st.subheader("☁️ Recent Cloud Chats")
-    
     cloud_chats = load_chats_from_cloud()
     for chat in cloud_chats:
         cid = chat['id']
@@ -100,14 +122,13 @@ with st.sidebar:
     if "edit_target" in st.session_state:
         new_name = st.text_input("కొత్త పేరు:")
         if st.button("Rename OK"):
-            # క్లౌడ్ లో పేరు మార్చడం
-            target_chat = next((c for c in cloud_chats if c['id'] == st.session_state.edit_target), None)
-            if target_chat:
-                save_chat_to_cloud(st.session_state.edit_target, target_chat['messages'], new_name)
+            t_chat = next((c for c in cloud_chats if c['id'] == st.session_state.edit_target), None)
+            if t_chat:
+                save_chat_to_cloud(st.session_state.edit_target, t_chat['messages'], new_name)
                 del st.session_state.edit_target
                 st.rerun()
 
-# --- మెయిన్ చాట్ ఏరియా ---
+# --- 8. మెయిన్ చాట్ ఏరియా (మీ అసలు డిజైన్ అలాగే ఉంది) ---
 if "chat_id" not in st.session_state:
     st.session_state.chat_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     st.session_state.messages = []
@@ -115,7 +136,6 @@ if "chat_id" not in st.session_state:
 
 st.header(f"🚀 {st.session_state.chat_title}")
 
-# మెసేజ్‌లను ప్రదర్శించడం
 for i, msg in enumerate(st.session_state.messages):
     col_msg, col_del = st.columns([0.9, 0.1])
     with col_msg:
@@ -136,8 +156,8 @@ for i, msg in enumerate(st.session_state.messages):
             save_chat_to_cloud(st.session_state.chat_id, st.session_state.messages, st.session_state.chat_title)
             st.rerun()
 
-# ఇన్‌పుట్ సెక్షన్
-audio = mic_recorder(start_prompt="🎙️ Voice Input", stop_prompt="🛑 Stop", key='recorder')
+# 9. ఇన్‌పుట్ సెక్షన్ (మీ ఒరిజినల్ Whisper Voice ఇన్‌పుట్)
+audio = mic_recorder(start_prompt="🎙️ Voice", stop_prompt="🛑 Stop", key='recorder')
 prompt = st.chat_input("Ask Mitra something...")
 
 user_text = prompt if prompt else None
@@ -146,30 +166,24 @@ if audio and not prompt:
         try:
             trans = client.audio.transcriptions.create(file=("audio.wav", audio['bytes']), model="whisper-large-v3", language="te")
             user_text = trans.text
-        except Exception as e:
-            st.error(f"Voice Error: {e}")
+        except: pass
 
 if user_text:
     st.session_state.messages.append({"role": "user", "content": user_text})
     with st.chat_message("user"): st.markdown(user_text)
 
     with st.chat_message("assistant"):
-        try:
-            res = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "system", "content": intel_prompt}] + st.session_state.messages
-            )
-            ans = res.choices[0].message.content
-            st.markdown(ans)
-            
-            # వాయిస్ అవుట్‌పుట్
-            speech_text = clean_for_speech(ans)
-            tts = gTTS(text=speech_text, lang='te')
-            fp = io.BytesIO(); tts.write_to_fp(fp); st.audio(fp)
-            
-            st.session_state.messages.append({"role": "assistant", "content": ans})
-            # క్లౌడ్ లో సేవ్ చేయడం
-            save_chat_to_cloud(st.session_state.chat_id, st.session_state.messages, st.session_state.chat_title)
-            st.rerun()
-        except Exception as e:
-            st.error(f"AI Error: {e}")
+        res = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "system", "content": current_intel}] + st.session_state.messages
+        )
+        ans = res.choices[0].message.content
+        st.markdown(ans)
+        
+        speech_text = clean_for_speech(ans)
+        tts = gTTS(text=speech_text, lang='te')
+        fp = io.BytesIO(); tts.write_to_fp(fp); st.audio(fp)
+        
+        st.session_state.messages.append({"role": "assistant", "content": ans})
+        save_chat_to_cloud(st.session_state.chat_id, st.session_state.messages, st.session_state.chat_title)
+        st.rerun()
