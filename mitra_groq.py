@@ -1,5 +1,5 @@
 import streamlit as st
-import google.generativeai as genai
+from openai import OpenAI  # OpenAI లైబ్రరీ
 from gtts import gTTS
 import io
 from datetime import datetime
@@ -13,25 +13,25 @@ st.set_page_config(page_title="Mitra AI - Om Shanti", layout="wide", page_icon="
 def initialize_all():
     try:
         supabase_client = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
-        api_key = st.secrets["GEMINI_KEY"]
+        # OpenAI API Key ని ఇక్కడ తీసుకుంటున్నాం
+        api_key = st.secrets["OPENAI_API_KEY"]
         return supabase_client, api_key
     except Exception as e:
         st.error(f"సెట్టింగ్స్ లో లోపం ఉంది: {e}")
         return None, None
 
-supabase, google_api_key = initialize_all()
-if not google_api_key: st.stop()
+supabase, openai_api_key = initialize_all()
+if not openai_api_key: 
+    st.warning("దయచేసి OpenAI API Key ని సెటప్ చేయండి.")
+    st.stop()
 
-# --- 3. ఆధ్యాత్మిక ఏఐ కాన్ఫిగరేషన్ ---
-# ఇక్కడ మోడల్ పేరును 'gemini-1.5-flash-latest' గా మారుస్తున్నాను, ఇది 404 ఎర్రర్‌ను నివారిస్తుంది
-genai.configure(api_key=google_api_key)
-model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash-latest'
-)
+# --- 3. OpenAI క్లయింట్ కాన్ఫిగరేషన్ ---
+client = OpenAI(api_key=openai_api_key)
 
 # --- 4. సహాయక ఫంక్షన్లు ---
 def get_clean_text(text):
-    for char in ['*', '#', '_', '`', ':', '(', ')', '[', ']', '-']: text = text.replace(char, ' ')
+    for char in ['*', '#', '_', '`', ':', '(', ')', '[', ']', '-']: 
+        text = text.replace(char, ' ')
     return text.strip()
 
 def ask_mitra(user_prompt):
@@ -41,9 +41,16 @@ def ask_mitra(user_prompt):
     2. ఆధ్యాత్మికత, మురళి జ్ఞానం, యోగం గురించి మాత్రమే వివరించు.
     """
     try:
-        # సెర్చ్ ఫీచర్ తాత్కాలికంగా పక్కన పెట్టి నేరుగా జెమిని జ్ఞానాన్ని వాడుతున్నాం
-        response = model.generate_content(f"{system_instruction}\n\nప్రశ్న: {user_prompt}")
-        return response.text
+        # GPT-4o లేదా gpt-3.5-turbo ఉపయోగించవచ్చు
+        response = client.chat.completions.create(
+            model="gpt-4o", # లేదా "gpt-3.5-turbo"
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7
+        )
+        return response.choices[0].message.content
     except Exception as e:
         return f"క్షమించండి మిత్రమా, లోపం: {e}"
 
@@ -58,7 +65,7 @@ with st.sidebar:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-st.header("🔱 మిత్ర - ఆధ్యాత్మిక జ్ఞాన వేదిక")
+st.header("🔱 మిత్ర - ఆధ్యాత్మిక జ్ఞాన వేదిక (GPT Powered)")
 
 for m in st.session_state.messages:
     with st.chat_message(m["role"]):
@@ -69,7 +76,8 @@ prompt = st.chat_input("మీ ఆధ్యాత్మిక సందేహా
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"): st.markdown(prompt)
+    with st.chat_message("user"): 
+        st.markdown(prompt)
     
     with st.chat_message("assistant"):
         with st.spinner("మిత్ర ఆలోచిస్తున్నాడు..."):
@@ -81,6 +89,8 @@ if prompt:
             try:
                 clean_ans = get_clean_text(answer)
                 tts = gTTS(text=clean_ans[:250], lang='te')
-                f = io.BytesIO(); tts.write_to_fp(f)
+                f = io.BytesIO()
+                tts.write_to_fp(f)
                 st.audio(f, format="audio/mp3")
-            except: pass
+            except:
+                pass
