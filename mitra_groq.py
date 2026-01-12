@@ -5,15 +5,19 @@ import io
 import uuid
 
 # --- 1. పేజీ సెట్టింగ్స్ ---
-st.set_page_config(page_title="Mitra AI - Enhanced", layout="wide", page_icon="🧘")
+st.set_page_config(page_title="Brahma Kumaris - Spiritual AI", layout="wide", page_icon="🧘")
 
 # --- 2. ఇనిషియలైజేషన్ ---
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = {}  
 if "current_chat_id" not in st.session_state:
-    st.session_state.current_chat_id = None
+    # మొదటిసారి ఓపెన్ చేసినప్పుడు ఆటోమేటిక్ గా ఒక చాట్ ఐడిని క్రియేట్ చేయడం (దీనివల్ల నేరుగా ప్రశ్న అడగవచ్చు)
+    initial_id = str(uuid.uuid4())
+    st.session_state.chat_history[initial_id] = {"title": "కొత్త సంభాషణ", "messages": []}
+    st.session_state.current_chat_id = initial_id
+
 if "ai_memory" not in st.session_state:
-    st.session_state.ai_memory = "నీ పేరు మిత్ర. నువ్వు బ్రహ్మకుమారిస్ ఆధ్యాత్మిక మార్గదర్శివి."
+    st.session_state.ai_memory = "నీ పేరు మిత్ర. నువ్వు బ్రహ్మకుమారిస్ ఆధ్యాత్మిక మార్గదర్శివి. కేవలం ఆధ్యాత్మికత, మురళి జ్ఞానం, యోగం గురించి మాత్రమే వివరించు."
 
 def get_groq_client():
     try:
@@ -24,7 +28,7 @@ def get_groq_client():
 
 client = get_groq_client()
 
-# --- 3. సైడ్ బార్ (చాట్ మేనేజ్మెంట్) ---
+# --- 3. సైడ్ బార్ ---
 with st.sidebar:
     st.title("🕉️ మిత్ర కంట్రోల్స్")
     
@@ -40,21 +44,26 @@ with st.sidebar:
     for chat_id in list(st.session_state.chat_history.keys()):
         col1, col2, col3 = st.columns([0.6, 0.2, 0.2])
         with col1:
-            if st.button(st.session_state.chat_history[chat_id]["title"], key=f"btn_{chat_id}", use_container_width=True):
+            # ప్రస్తుత చాట్ ను హైలైట్ చేయడం కోసం చిన్న లాజిక్
+            btn_label = st.session_state.chat_history[chat_id]["title"]
+            if st.button(btn_label, key=f"btn_{chat_id}", use_container_width=True):
                 st.session_state.current_chat_id = chat_id
                 st.rerun()
         
-        # చాట్ రీనేమ్ (✏️)
         with col2:
             if st.button("✏️", key=f"ren_{chat_id}"):
                 st.session_state.rename_id = chat_id
         
-        # పూర్తి చాట్ డిలీట్
         with col3:
             if st.button("🗑️", key=f"del_{chat_id}"):
                 del st.session_state.chat_history[chat_id]
-                if st.session_state.current_chat_id == chat_id:
-                    st.session_state.current_chat_id = None
+                # ఒకవేళ ఉన్న చాట్ డిలీట్ అయితే కొత్తదాన్ని క్రియేట్ చేయడం
+                if not st.session_state.chat_history:
+                    new_id = str(uuid.uuid4())
+                    st.session_state.chat_history[new_id] = {"title": "కొత్త సంభాషణ", "messages": []}
+                    st.session_state.current_chat_id = new_id
+                elif st.session_state.current_chat_id == chat_id:
+                    st.session_state.current_chat_id = list(st.session_state.chat_history.keys())[0]
                 st.rerun()
         
         if "rename_id" in st.session_state and st.session_state.rename_id == chat_id:
@@ -68,21 +77,16 @@ with st.sidebar:
     with st.expander("⚙️ ఏఐ మెమరీ సెట్టింగ్స్"):
         st.session_state.ai_memory = st.text_area("జ్ఞాపకాలు:", value=st.session_state.ai_memory, height=150)
 
-# --- 4. ప్రధాన స్క్రీన్ ---
-st.header("🔱 మిత్ర - ఆధ్యాత్మిక జ్ఞాన వేదిక")
-
-if not st.session_state.current_chat_id:
-    st.info("చాట్ ప్రారంభించడానికి 'కొత్త చాట్' నొక్కండి.")
-    st.stop()
+# --- 4. ప్రధాన స్క్రీన్ (మార్పు చేసిన హెడర్) ---
+st.header("🔱 బ్రహ్మకుమారిస్ ఆధ్యాత్మిక జ్ఞాన వేదిక")
 
 current_chat = st.session_state.chat_history[st.session_state.current_chat_id]
 
-# మెసేజ్ హిస్టరీ ప్రదర్శన
+# మెసేజ్ హిస్టరీ
 for idx, m in enumerate(current_chat["messages"]):
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
         
-        # ఆడియో (కేవలం అసిస్టెంట్ సమాధానాలకు)
         if m["role"] == "assistant":
             try:
                 clean_txt = m["content"].replace("*","").replace("#","")
@@ -91,25 +95,21 @@ for idx, m in enumerate(current_chat["messages"]):
                 st.audio(f)
             except: pass
 
-        # --- మెసేజ్ లెవల్ కంట్రోల్స్ (Save & Delete) ---
         c1, c2, _ = st.columns([0.07, 0.07, 0.86])
         with c1:
-            # ప్రతి మెసేజ్ కింద డిలీట్ బటన్
             if st.button("🗑️", key=f"msg_del_{idx}"):
                 current_chat["messages"].pop(idx)
                 st.rerun()
         with c2:
-            # ప్రతి మెసేజ్ కింద సేవ్ (డౌన్లోడ్) బటన్
-            st.download_button("💾", m["content"], file_name=f"mitra_chat_{idx}.txt", key=f"msg_save_{idx}")
+            st.download_button("💾", m["content"], file_name=f"mitra_msg_{idx}.txt", key=f"msg_save_{idx}")
 
 # --- 5. యూజర్ ఇన్‌పుట్ ---
 st.divider()
-user_input = st.chat_input("మీ సందేహాన్ని ఇక్కడ అడగండి...")
+user_input = st.chat_input("మీ ఆధ్యాత్మిక సందేహాన్ని ఇక్కడ అడగండి...")
 
 if user_input:
     current_chat["messages"].append({"role": "user", "content": user_input})
     
-    # ఆటోమేటిక్ టైటిల్ (మొదటి మెసేజ్ తో)
     if len(current_chat["messages"]) <= 2:
         current_chat["title"] = user_input[:20] + "..."
 
@@ -127,7 +127,6 @@ if user_input:
                 st.markdown(answer)
                 current_chat["messages"].append({"role": "assistant", "content": answer})
                 
-                # ఆడియో ప్లేయర్
                 clean_ans = answer.replace("*","").replace("#","")
                 tts = gTTS(text=clean_ans, lang='te')
                 f = io.BytesIO(); tts.write_to_fp(f)
