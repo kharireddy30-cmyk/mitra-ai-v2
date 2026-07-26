@@ -1,12 +1,13 @@
 import streamlit as st
-from gtts import gTTS
+import edge_tts
 from pydub import AudioSegment
+import asyncio
 import io
 import uuid
 
 # --- 1. పేజీ సెట్టింగ్స్ ---
 st.set_page_config(
-    page_title="Brahma Kumaris - Spiritual TTS Engine", 
+    page_title="Brahma Kumaris - Spiritual Voice Generator", 
     layout="wide", 
     page_icon="🧘"
 )
@@ -21,6 +22,15 @@ if "current_chat_id" not in st.session_state:
 
 if "rename_id" not in st.session_state:
     st.session_state.rename_id = None
+
+# edge-tts async ఫంక్షన్
+async def generate_voice(text, voice):
+    communicate = edge_tts.Communicate(text, voice)
+    audio_data = b""
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            audio_data += chunk["data"]
+    return audio_data
 
 # --- 3. సైడ్ బార్ ---
 with st.sidebar:
@@ -71,17 +81,16 @@ with st.sidebar:
                     st.rerun()
 
 # --- 4. ప్రధాన స్క్రీన్ ---
-st.header("🔱 బ్రహ్మకుమారీస్ - తెలుగు ఆధ్యాత్మిక వాయిస్ కన్వర్టర్ (TTS)")
-st.caption("మీ ఆధ్యాత్మిక వచనాలు లేదా బాబా మురళీ టెక్స్ట్‌ని వాయిస్‌గా మార్చండి మరియు మీకు కావలసిన స్పీడ్‌లో MP3 గా డౌన్‌లోడ్ చేసుకోండి.")
+st.header("🔱 బ్రహ్మకుమారీస్ - ఆధ్యాత్మిక వాయిస్ కన్వర్టర్")
+st.caption("గంభీరమైన తెలుగు స్త్రీ మరియు పురుషుల స్వరాన్ని ఎంచుకుని మీ ఆధ్యాత్మిక టెక్స్ట్‌ని MP3 గా మార్చుకోండి.")
 
 current_chat = st.session_state.chat_history[st.session_state.current_chat_id]
-
 msg_to_delete = None
 
 for idx, m in enumerate(current_chat["messages"]):
     with st.chat_message("assistant", avatar="🕉️"):
         st.markdown(m["text"])
-        st.caption(f"🔊 ఆడియో వేగం (Speed): {m.get('speed', 1.0)}x")
+        st.caption(f"🎙️ గొంతు: {m.get('voice_name', 'తెలుగు')} | 🔊 వేగం: {m.get('speed', 1.0)}x")
         
         if "audio" in m and m["audio"] is not None:
             st.audio(m["audio"], format="audio/mp3")
@@ -95,7 +104,7 @@ for idx, m in enumerate(current_chat["messages"]):
                 st.download_button(
                     label="📥 MP3 డౌన్‌లోడ్", 
                     data=m["audio"], 
-                    file_name=f"spiritual_audio_{m.get('speed', 1.0)}x_{idx+1}.mp3", 
+                    file_name=f"spiritual_audio_{idx+1}.mp3", 
                     mime="audio/mp3",
                     key=f"audio_dl_{idx}"
                 )
@@ -104,41 +113,45 @@ if msg_to_delete is not None:
     current_chat["messages"].pop(msg_to_delete)
     st.rerun()
 
-# --- 5. ఇన్‌పుట్ & స్పీడ్ సెట్టింగ్స్ ---
+# --- 5. ఇన్‌పుట్ & వాయిస్ సెట్టింగ్స్ ---
 st.divider()
-user_text = st.text_area("ఆడియోగా మార్చాలనుకుంటున్న తెలుగు టెక్స్ట్‌ని ఇక్కడ పేస్ట్ చేయండి:", height=120, placeholder="బాబా చెప్పారు... ఓం శాంతి.")
+user_text = st.text_area("ఆడియోగా మార్చాలనుకుంటున్న తెలుగు టెక్స్ట్‌ని ఇక్కడ పేస్ట్ చేయండి:", height=130, placeholder="బాబా చెప్పారు... ఓం శాంతి.")
 
-col_a, col_b = st.columns([0.5, 0.5])
-with col_a:
-    audio_speed = st.select_slider(
-        "🎙️ ఆడియో వేగాన్ని ఎంచుకోండి (Audio Speed):",
-        options=[0.75, 1.0, 1.25, 1.5, 1.75, 2.0],
-        value=1.0,
-        help="మీరు ఎంచుకున్న ఈ వేగంతోనే MP3 డౌన్‌లోడ్ అవుతుంది."
+col_1, col_2 = st.columns([0.5, 0.5])
+
+with col_1:
+    voice_option = st.radio(
+        "🎙️ వాయిస్ స్వరాన్ని ఎంచుకోండి (Select Voice):",
+        options=["👨 మోహన్ (గంభీరమైన పురుష గొంతు)", "👩 శ్రుతి (స్పష్టమైన స్త్రీ గొంతు)"],
+        horizontal=True
     )
 
-with col_b:
-    st.write("") # స్పేసింగ్ కోసం
-    st.write("")
-    convert_btn = st.button("🔊 వాయిస్ క్రియేట్ చేయి (Convert to Speech)", type="primary", use_container_width=True)
+with col_2:
+    audio_speed = st.select_slider(
+        "🔊 ఆడియో వేగాన్ని ఎంచుకోండి (Audio Speed):",
+        options=[0.75, 1.0, 1.25, 1.5, 1.75, 2.0],
+        value=1.0
+    )
+
+convert_btn = st.button("🔊 ఆధ్యాత్మిక వాయిస్ క్రియేట్ చేయి", type="primary", use_container_width=True)
 
 if convert_btn:
     if user_text.strip():
-        with st.spinner("ఆధ్యాత్మిక వాయిస్ తయారవుతోంది..."):
+        with st.spinner("సాఫ్ట్ & గంభీరమైన వాయిస్ తయారవుతోంది..."):
             try:
                 clean_txt = user_text.replace("*", "").replace("#", "")
                 
-                # 1. gTTS తో మూల ఆడియో జనరేట్ చేయడం
-                tts = gTTS(text=clean_txt, lang='te')
-                raw_fp = io.BytesIO()
-                tts.write_to_fp(raw_fp)
-                raw_fp.seek(0)
+                # వాయిస్ సెలక్షన్
+                selected_voice = "te-IN-MohanNeural" if "మోహన్" in voice_option else "te-IN-ShrutiNeural"
+                voice_label = "మోహన్ (పురుష)" if "మోహన్" in voice_option else "శ్రుతి (స్త్రీ)"
 
-                # 2. pydub తో స్పీడ్ మార్చడం
+                # 1. edge-tts తో హై-క్వాలిటీ ఆడియో జనరేట్ చేయడం
+                raw_audio = asyncio.run(generate_voice(clean_txt, selected_voice))
+                raw_fp = io.BytesIO(raw_audio)
+
+                # 2. pydub తో స్పీడ్ అడ్జస్ట్‌మెంట్
                 sound = AudioSegment.from_file(raw_fp, format="mp3")
-                
                 if audio_speed != 1.0:
-                    # స్పీడ్ ఛేంజ్ లాజిక్
                     sound = sound._spawn(sound.raw_data, overrides={
                         "frame_rate": int(sound.frame_rate * audio_speed)
                     }).set_frame_rate(sound.frame_rate)
@@ -152,16 +165,17 @@ if convert_btn:
                 current_chat["messages"].append({
                     "text": user_text,
                     "audio": audio_bytes,
-                    "speed": audio_speed
+                    "speed": audio_speed,
+                    "voice_name": voice_label
                 })
 
                 if len(current_chat["messages"]) == 1 or current_chat["title"] == "కొత్త ఆడియో నోట్":
                     current_chat["title"] = user_text[:20] + ("..." if len(user_text) > 20 else "")
 
-                st.success(f"{audio_speed}x వేగంతో ఆడియో సిద్ధమైంది!")
+                st.success("గంభీరమైన ఆధ్యాత్మిక వాయిస్ సిద్ధమైంది!")
                 st.rerun()
 
             except Exception as e:
-                st.error(f"వాయిస్ తయారీలో లోపం: {e}. దయచేసి 'pip install pydub' చేశారో లేదో చూడండి.")
+                st.error(f"వాయిస్ తయారీలో లోపం వచ్చింది: {e}")
     else:
         st.warning("దయచేసి టెక్స్ట్ ఎంటర్ చేయండి.")
