@@ -6,3 +6,4 @@ supabase
 requests
 openai
 groq
+pydub
