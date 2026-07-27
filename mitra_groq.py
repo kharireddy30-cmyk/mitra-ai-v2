@@ -9,14 +9,16 @@ import os
 import docx
 from pypdf import PdfReader
 
-# --- 1. పేజీ సెట్టింగ్స్ ---
+# ==========================================
+# 1. పేజీ సెట్టింగ్స్ & కాన్ఫిగరేషన్
+# ==========================================
 st.set_page_config(
-    page_title="Brahma Kumaris - Multi-Lingual Spiritual TTS", 
+    page_title="Brahma Kumaris - Advanced Multi-Lingual Spiritual TTS", 
     layout="wide", 
     page_icon="🧘"
 )
 
-# --- 2. ఇనిషియలైజేషన్ ---
+# Session State ఇనిషియలైజేషన్
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = {}  
 if "current_chat_id" not in st.session_state:
@@ -27,7 +29,12 @@ if "current_chat_id" not in st.session_state:
 if "rename_id" not in st.session_state:
     st.session_state.rename_id = None
 
-# Single Chunk Edge-TTS Async
+
+# ==========================================
+# 2. హెల్పర్ ఫంక్షన్స్ (Core Logic & File Readers)
+# ==========================================
+
+# A. Edge-TTS Async Chunk Generator
 async def generate_voice_chunk(text, voice, pitch_val, rate_val):
     communicate = edge_tts.Communicate(text, voice, pitch=pitch_val, rate=rate_val)
     audio_data = b""
@@ -36,7 +43,8 @@ async def generate_voice_chunk(text, voice, pitch_val, rate_val):
             audio_data += chunk["data"]
     return audio_data
 
-# Auto-Chunking Logic
+
+# B. Auto-Chunking Logic (Smart Text Splitter)
 def split_text_into_chunks(text, max_chars=350):
     sentences = re.split(r'(?<=[.!?\n।])\s+', text)
     chunks = []
@@ -55,7 +63,39 @@ def split_text_into_chunks(text, max_chars=350):
         
     return chunks
 
-# --- 3. సైడ్ బార్ ---
+
+# C. File Text Extractor (.docx, .pdf, .txt)
+def extract_text_from_file(uploaded_file):
+    extracted = ""
+    if uploaded_file.name.endswith(".docx"):
+        doc = docx.Document(uploaded_file)
+        extracted = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+    elif uploaded_file.name.endswith(".pdf"):
+        reader = PdfReader(uploaded_file)
+        pdf_text = []
+        for page in reader.pages:
+            t = page.extract_text()
+            if t:
+                pdf_text.append(t)
+        extracted = "\n".join(pdf_text)
+    elif uploaded_file.name.endswith(".txt"):
+        extracted = uploaded_file.read().decode("utf-8")
+    return extracted
+
+
+# D. Word Counter & Duration Estimator
+def get_text_analytics(text, speed_factor=0.85):
+    words = text.split()
+    word_count = len(words)
+    # సాధారణంగా ప్రసంగ వేగం: నిమిషానికి ~130 పదాలు (0.85x వేగం వద్ద)
+    words_per_minute = 130 * speed_factor
+    estimated_minutes = word_count / words_per_minute if words_per_minute > 0 else 0
+    return word_count, round(estimated_minutes, 1)
+
+
+# ==========================================
+# 3. సైడ్ బార్ (Chat History & Management)
+# ==========================================
 with st.sidebar:
     st.title("🕉️ ఆడియో నోట్స్ కంట్రోల్స్")
     if st.button("➕ కొత్త ఆడియో నోట్", use_container_width=True):
@@ -103,17 +143,27 @@ with st.sidebar:
                         st.session_state.current_chat_id = list(st.session_state.chat_history.keys())[0]
                     st.rerun()
 
-# --- 4. ప్రధాన స్క్రీన్ ---
-st.header("🔱 బ్రహ్మకుమారీస్ - బహుభాషా ఆధ్యాత్మిక వాయిస్ కన్వర్టర్")
-st.caption("తెలుగు, హిందీ మరియు ఇంగ్లీష్ ఆధ్యాత్మిక ఫైల్స్ / టెక్స్ట్‌ను గంభీరమైన స్వరం మరియు BGM తో MP3 గా మార్చుకోండి.")
+
+# ==========================================
+# 4. ప్రధాన స్క్రీన్ (Main Interface & History Display)
+# ==========================================
+st.header("🔱 బ్రహ్మకుమారీస్ - అడ్వాన్స్డ్ ఆధ్యాత్మిక వాయిస్ కన్వర్టర్")
+st.caption("కట్ కాకుండా ఫైల్స్ అప్‌లోడ్, పేరాల మధ్య విరామం (Pause), పిచ్ కంట్రోల్ మరియు BGM తో అధునాతన ఆడియో సిస్టమ్.")
 
 current_chat = st.session_state.chat_history[st.session_state.current_chat_id]
 msg_to_delete = None
 
+# సేవ్ అయిన సందేశాలు & ఆడియోలు చూపించడం
 for idx, m in enumerate(current_chat["messages"]):
     with st.chat_message("assistant", avatar="🕉️"):
         st.markdown(m["text"])
-        st.caption(f"🌐 భాష: {m.get('lang_name', 'తెలుగు')} | 🎙️ వాయిస్: {m.get('voice_name', 'తెలుగు')} | 🎵 BGM: {m.get('bgm_status', 'No')} | 🔊 వేగం: {m.get('speed', 1.0)}x")
+        st.caption(
+            f"🌐 భాష: {m.get('lang_name', 'తెలుగు')} | "
+            f"🎙️ వాయిస్: {m.get('voice_name', 'తెలుగు')} | "
+            f"🎵 BGM: {m.get('bgm_status', 'No')} | "
+            f"🔊 వేగం: {m.get('speed', 1.0)}x | "
+            f"⏸️ విరామం: {m.get('pause_sec', 0.5)}s"
+        )
         
         if "audio" in m and m["audio"] is not None:
             st.audio(m["audio"], format="audio/mp3")
@@ -136,10 +186,13 @@ if msg_to_delete is not None:
     current_chat["messages"].pop(msg_to_delete)
     st.rerun()
 
-# --- 5. ఫైల్ అప్‌లోడర్ & ఇన్‌పుట్ సెట్టింగ్స్ ---
+
+# ==========================================
+# 5. ఇన్‌పుట్, ఫైల్ అప్‌లోడ్ & అడ్వాన్స్డ్ కంట్రోల్స్
+# ==========================================
 st.divider()
 
-# ✨ కొత్త ఫీచర్: వర్డ్ / పీడీఎఫ్ / టెక్స్ట్ ఫైల్ అప్‌లోడర్
+# A. ఫైల్ అప్‌లోడర్
 uploaded_file = st.file_uploader(
     "📁 మీ మురళీ ఫైల్‌ను ఇక్కడ అప్‌లోడ్ చేయండి (.docx, .pdf, .txt):", 
     type=["docx", "pdf", "txt"],
@@ -147,28 +200,14 @@ uploaded_file = st.file_uploader(
 )
 
 file_extracted_text = ""
-
 if uploaded_file is not None:
     try:
-        if uploaded_file.name.endswith(".docx"):
-            doc = docx.Document(uploaded_file)
-            file_extracted_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
-        elif uploaded_file.name.endswith(".pdf"):
-            reader = PdfReader(uploaded_file)
-            pdf_text = []
-            for page in reader.pages:
-                t = page.extract_text()
-                if t:
-                    pdf_text.append(t)
-            file_extracted_text = "\n".join(pdf_text)
-        elif uploaded_file.name.endswith(".txt"):
-            file_extracted_text = uploaded_file.read().decode("utf-8")
-
+        file_extracted_text = extract_text_from_file(uploaded_file)
         st.success(f"✅ '{uploaded_file.name}' ఫైల్ నుండి టెక్స్ట్ విజయవంతంగా లోడ్ అయింది!")
     except Exception as fe:
         st.error(f"ఫైల్ చదవడంలో లోపం వచ్చింది: {fe}")
 
-# టెక్స్ట్ ఏరియా (ఫైల్ అప్‌లోడ్ చేస్తే అందులోని టెక్స్ట్ స్వయంచాలకంగా ఇక్కడికి వస్తుంది)
+# B. టెక్స్ట్ ఏరియా
 user_text = st.text_area(
     "ఆడియోగా మార్చాలనుకుంటున్న టెక్స్ట్ (ఫైల్ అప్‌లోడ్ చేయవచ్చు లేదా నేరుగా ఇక్కడ పేస్ట్ చేయవచ్చు):", 
     value=file_extracted_text,
@@ -176,6 +215,12 @@ user_text = st.text_area(
     placeholder="బాబా చెప్పారు... / बाबा ने कहा... / Baba said..."
 )
 
+# C. అనలిటిక్స్ కార్డ్ (Word Count & Estimated Duration)
+if user_text.strip():
+    w_count, est_mins = get_text_analytics(user_text)
+    st.info(f"📊 **మొత్తం పదాలు:** {w_count:,} | ⏱️ **అంచనా ఆడియో సమయం:** ~{est_mins} నిమిషాలు (ప్రశాంతమైన వేగం వద్ద)")
+
+# D. ప్రాథమిక సెట్టింగ్స్ (భాష, వాయిస్, వేగం)
 col_lang, col_voice, col_speed = st.columns([0.3, 0.35, 0.35])
 
 with col_lang:
@@ -211,21 +256,45 @@ with col_speed:
         value=0.85
     )
 
-col_bgm1, col_bgm2 = st.columns([0.5, 0.5])
-with col_bgm1:
+# E. ✨ అడ్వాన్స్డ్ కంట్రోల్స్ (Pause, Pitch & BGM)
+st.markdown("##### ⚙️ అడ్వాన్స్డ్ ఆడియో సెట్టింగ్స్ (Advanced Fine-Tuning)")
+col_pause, col_pitch, col_bgm_box = st.columns([0.33, 0.33, 0.34])
+
+with col_pause:
+    pause_duration = st.slider(
+        "⏸️ వాక్యాల మధ్య విరామం (Pause Sec):",
+        min_value=0.3,
+        max_value=2.0,
+        value=0.6,
+        step=0.1,
+        help="వాక్యానికి వాక్యానికి మధ్య ప్రశాంతమైన నిశ్శబ్దం (Silence). ధారణకు 0.6s - 1.0s ఉత్తమం."
+    )
+
+with col_pitch:
+    pitch_custom = st.select_slider(
+        "🎚️ వాయిస్ గంభీరత (Pitch Base):",
+        options=["సాధారణ (Normal)", "గంభీరం (Deep Base)", "అత్యంత గంభీరం (Heavy Base)"],
+        value="గంభీరం (Deep Base)",
+        help="స్వరం ఎంత బేస్/గంభీరంగా ఉండాలో ఎంచుకోండి."
+    )
+
+with col_bgm_box:
     enable_bgm = st.checkbox("🎶 BGM (బ్యాక్‌గ్రౌండ్ మ్యూజిక్) జోడించు", value=True)
-with col_bgm2:
     bgm_volume = st.slider("🎵 BGM శబ్దం (Volume %):", min_value=2, max_value=20, value=6)
 
+
+# ==========================================
+# 6. ఆడియో జనరేషన్ అండ్ ప్రాసెసింగ్ (Convert Button)
+# ==========================================
 convert_btn = st.button("🔊 ఆధ్యాత్మిక వాయిస్ & BGM క్రియేట్ చేయి", type="primary", use_container_width=True)
 
 if convert_btn:
     if user_text.strip():
-        with st.spinner("టెక్స్ట్‌ని ప్రాసెస్ చేసి వాయిస్ జనరేట్ చేస్తోంది... దయచేసి వేచి ఉండండి..."):
+        with st.spinner("టెక్స్ట్‌ని ప్రాసెస్ చేసి, అడ్వాన్స్డ్ ఆడియో కంట్రోల్స్‌తో MP3 క్రియేట్ చేస్తోంది... దయచేసి వేచి ఉండండి..."):
             try:
                 clean_txt = user_text.replace("*", "").replace("#", "")
                 
-                # వాయిస్ మ్యాపింగ్ లాజిక్
+                # 1. వాయిస్ మ్యాపింగ్
                 voice_map = {
                     "👨 మోహన్ (పురుష)": ("te-IN-MohanNeural", "మోహన్ (తెలుగు)", "తెలుగు"),
                     "👩 శ్రుతి (స్త్రీ)": ("te-IN-ShrutiNeural", "శ్రుతి (తెలుగు)", "తెలుగు"),
@@ -234,20 +303,26 @@ if convert_btn:
                     "👨 ప్రభాత్ (పురుష - ఇంగ్లీష్)": ("en-IN-PrabhatNeural", "ప్రభాత్ (ఇంగ్లీష్)", "ఇంగ్లీష్"),
                     "👩 నీరజ (స్త్రీ - ఇంగ్లీష్)": ("en-IN-NeerjaNeural", "నీరజ (ఇంగ్లీష్)", "ఇంగ్లీష్")
                 }
-
                 selected_voice_code, voice_label, lang_label = voice_map[voice_option]
 
-                # స్పీడ్ & పిచ్ సెట్టింగ్స్
+                # 2. స్పీడ్ & పిచ్ లెక్కించడం
                 rate_str = f"{int((audio_speed - 1.0) * 100):+d}%"
-                pitch_str = "-10Hz" if "పురుష" in voice_option else "-5Hz"
+                
+                pitch_val_map = {
+                    "సాధారణ (Normal)": "0Hz",
+                    "గంభీరం (Deep Base)": "-10Hz" if "పురుష" in voice_option else "-5Hz",
+                    "అత్యంత గంభీరం (Heavy Base)": "-18Hz" if "పురుష" in voice_option else "-10Hz"
+                }
+                pitch_str = pitch_val_map[pitch_custom]
 
-                # 1. ఆటో-చంకింగ్
+                # 3. ఆటో-చంకింగ్ (Auto-Chunking)
                 text_chunks = split_text_into_chunks(clean_txt, max_chars=350)
                 
                 speech_sound = AudioSegment.empty()
-                silence_pause = AudioSegment.silent(duration=500)
+                # యూజర్ ఎంచుకున్న పాజ్ డ్యూరేషన్
+                silence_pause = AudioSegment.silent(duration=int(pause_duration * 1000))
 
-                # 2. వాయిస్ జనరేషన్
+                # 4. ఆడియో జనరేషన్ & స్టిచింగ్ (Stitching)
                 for chunk in text_chunks:
                     raw_audio = asyncio.run(generate_voice_chunk(chunk, selected_voice_code, pitch_str, rate_str))
                     chunk_sound = AudioSegment.from_file(io.BytesIO(raw_audio), format="mp3")
@@ -256,7 +331,7 @@ if convert_btn:
                 final_sound = speech_sound
                 bgm_status = "No"
 
-                # 3. BGM మిక్సింగ్
+                # 5. BGM మిక్సింగ్ లాజిక్
                 if enable_bgm and os.path.exists("bgm.mp3"):
                     try:
                         bgm_sound = AudioSegment.from_file("bgm.mp3")
@@ -270,27 +345,29 @@ if convert_btn:
                         final_sound = speech_sound.overlay(bgm_sound)
                         bgm_status = f"Yes ({bgm_volume}%)"
                     except Exception as bgm_err:
-                        st.warning(f"BGM మిక్సింగ్ లో సమస్య: {bgm_err}")
+                        st.warning(f"BGM మిక్సింగ్ లో చిన్న సమస్య: {bgm_err}")
 
+                # 6. ఫైనల్ ఫైల్ ఎక్స్‌పోర్ట్
                 final_fp = io.BytesIO()
                 final_sound.export(final_fp, format="mp3")
                 final_fp.seek(0)
                 audio_bytes = final_fp.getvalue()
 
-                # 4. సేవ్ చేయడం
+                # 7. సేవ్ చేయడం
                 current_chat["messages"].append({
                     "text": user_text,
                     "audio": audio_bytes,
                     "speed": audio_speed,
                     "voice_name": voice_label,
                     "lang_name": lang_label,
+                    "pause_sec": pause_duration,
                     "bgm_status": bgm_status
                 })
 
                 if len(current_chat["messages"]) == 1 or current_chat["title"] == "కొత్త ఆడియో నోట్":
                     current_chat["title"] = user_text[:20] + ("..." if len(user_text) > 20 else "")
 
-                st.success(f"{lang_label} ఆడియో విజయవంతంగా సిద్ధమైంది!")
+                st.success(f"🎉 {lang_label} ఆడియో విజయవంతంగా సిద్ధమైంది!")
                 st.rerun()
 
             except Exception as e:
