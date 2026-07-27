@@ -6,6 +6,8 @@ import io
 import uuid
 import re
 import os
+import docx
+from pypdf import PdfReader
 
 # --- 1. పేజీ సెట్టింగ్స్ ---
 st.set_page_config(
@@ -103,7 +105,7 @@ with st.sidebar:
 
 # --- 4. ప్రధాన స్క్రీన్ ---
 st.header("🔱 బ్రహ్మకుమారీస్ - బహుభాషా ఆధ్యాత్మిక వాయిస్ కన్వర్టర్")
-st.caption("తెలుగు, హిందీ మరియు ఇంగ్లీష్ ఆధ్యాత్మిక టెక్స్ట్‌ను గంభీరమైన స్వరం మరియు BGM తో MP3 గా మార్చుకోండి.")
+st.caption("తెలుగు, హిందీ మరియు ఇంగ్లీష్ ఆధ్యాత్మిక ఫైల్స్ / టెక్స్ట్‌ను గంభీరమైన స్వరం మరియు BGM తో MP3 గా మార్చుకోండి.")
 
 current_chat = st.session_state.chat_history[st.session_state.current_chat_id]
 msg_to_delete = None
@@ -134,9 +136,45 @@ if msg_to_delete is not None:
     current_chat["messages"].pop(msg_to_delete)
     st.rerun()
 
-# --- 5. ఇన్‌పుట్ & భాష సెట్టింగ్స్ ---
+# --- 5. ఫైల్ అప్‌లోడర్ & ఇన్‌పుట్ సెట్టింగ్స్ ---
 st.divider()
-user_text = st.text_area("ఆడియోగా మార్చాలనుకుంటున్న టెక్స్ట్‌ని ఇక్కడ పేస్ట్ చేయండి (తెలుగు / హిందీ / ఇంగ్లీష్):", height=140, placeholder="బాబా చెప్పారు... / बाबा ने कहा... / Baba said...")
+
+# ✨ కొత్త ఫీచర్: వర్డ్ / పీడీఎఫ్ / టెక్స్ట్ ఫైల్ అప్‌లోడర్
+uploaded_file = st.file_uploader(
+    "📁 మీ మురళీ ఫైల్‌ను ఇక్కడ అప్‌లోడ్ చేయండి (.docx, .pdf, .txt):", 
+    type=["docx", "pdf", "txt"],
+    help="వర్డ్ ఫైల్, పీడీఎఫ్ లేదా టెక్స్ట్ ఫైల్‌ని అప్‌లోడ్ చేస్తే ఆటోమేటిక్‌గా టెక్స్ట్ చదవబడుతుంది."
+)
+
+file_extracted_text = ""
+
+if uploaded_file is not None:
+    try:
+        if uploaded_file.name.endswith(".docx"):
+            doc = docx.Document(uploaded_file)
+            file_extracted_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+        elif uploaded_file.name.endswith(".pdf"):
+            reader = PdfReader(uploaded_file)
+            pdf_text = []
+            for page in reader.pages:
+                t = page.extract_text()
+                if t:
+                    pdf_text.append(t)
+            file_extracted_text = "\n".join(pdf_text)
+        elif uploaded_file.name.endswith(".txt"):
+            file_extracted_text = uploaded_file.read().decode("utf-8")
+
+        st.success(f"✅ '{uploaded_file.name}' ఫైల్ నుండి టెక్స్ట్ విజయవంతంగా లోడ్ అయింది!")
+    except Exception as fe:
+        st.error(f"ఫైల్ చదవడంలో లోపం వచ్చింది: {fe}")
+
+# టెక్స్ట్ ఏరియా (ఫైల్ అప్‌లోడ్ చేస్తే అందులోని టెక్స్ట్ స్వయంచాలకంగా ఇక్కడికి వస్తుంది)
+user_text = st.text_area(
+    "ఆడియోగా మార్చాలనుకుంటున్న టెక్స్ట్ (ఫైల్ అప్‌లోడ్ చేయవచ్చు లేదా నేరుగా ఇక్కడ పేస్ట్ చేయవచ్చు):", 
+    value=file_extracted_text,
+    height=150, 
+    placeholder="బాబా చెప్పారు... / बाबा ने कहा... / Baba said..."
+)
 
 col_lang, col_voice, col_speed = st.columns([0.3, 0.35, 0.35])
 
@@ -258,4 +296,4 @@ if convert_btn:
             except Exception as e:
                 st.error(f"ఆడియో తయారీలో లోపం: {e}")
     else:
-        st.warning("దయచేసి టెక్స్ట్ ఎంటర్ చేయండి.")
+        st.warning("దయచేసి టెక్స్ట్ ఎంటర్ చేయండి లేదా ఫైల్ అప్‌లోడ్ చేయండి.")
