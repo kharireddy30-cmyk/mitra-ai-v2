@@ -28,7 +28,6 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Mandali&display=swap');
     * { font-family: 'Mandali', 'Segoe UI', Tahoma, sans-serif; }
     
-    /* మొబైల్ కాంపాక్ట్ సైజులు */
     .block-container { padding-top: 1rem; padding-bottom: 2rem; }
     div.stButton > button, div.stDownloadButton > button {
         font-weight: 600 !important;
@@ -60,7 +59,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. All-in-One Engine Online.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Complete TTS Engine & BGM Online.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -69,11 +68,11 @@ def add_log(msg, color="#38bdf8"):
 
 
 # ==========================================
-# 2. కోర్ DSP, STT & డాక్యుమెంట్ ఫంక్షన్లు
+# 2. కోర్ DSP, STT & డాక్యుమెంట్ ఇంజిన్
 # ==========================================
 
 def apply_audio_dsp(audio_segment: AudioSegment) -> AudioSegment:
-    """ఆడియో క్వాలిటీని పెంచే DSP ఫిల్టర్లు (మృదువైన గొంతుల కోసం)"""
+    """ఆడియో క్వాలిటీని పెంచే DSP ఫిల్టర్లు"""
     try:
         processed = high_pass_filter(audio_segment, cutoff=300)
         processed = low_pass_filter(processed, cutoff=3800)
@@ -105,7 +104,7 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="te-IN", enable_dsp=Tru
         
         sound = sound.set_channels(1).set_frame_rate(16000)
         
-        # 50 సెకన్ల చొప్పున ఆడియో విభజన (Chunking Loop)
+        # 50 సెకన్ల చొప్పున ఆడియో విభజన
         chunk_length_ms = 50 * 1000
         total_len = len(sound)
         
@@ -219,7 +218,7 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             except Exception as fe:
                 st.error(f"Error: {fe}")
 
-    # 2. AUDIO STT (మల్టీ-లాంగ్వేజ్ & 5-15+ నిమిషాల ఆడియో)
+    # 2. AUDIO STT (మల్టీ-లాంగ్వేజ్ సపోర్ట్)
     with c_audio_stt:
         st.markdown("**🎵 AUDIO STT (Full Audio)**")
         stt_lang_choice = st.selectbox("Audio Lang:", options=["HI (हिंदी)", "TE (తెలుగు)", "EN (English)"], key="stt_lang_choice", label_visibility="collapsed")
@@ -273,21 +272,37 @@ user_input_text = st.text_area(
 if user_input_text != st.session_state.main_text:
     st.session_state.main_text = user_input_text
 
+
 # ==========================================
-# 5. TTS SETTINGS & CONTROLS
+# 5. సంపూర్ణ TTS SETTINGS (Speed, Pitch, Pause, BGM)
 # ==========================================
-col_tts_lang, col_tts_voice, col_tts_speed = st.columns([0.34, 0.36, 0.30])
-with col_tts_lang:
-    tts_lang = st.selectbox("🌐 TTS Lang:", options=["Hindi (हिंदी)", "Telugu (తెలుగు)", "English"], key="main_tts_lang_select")
-with col_tts_voice:
-    if "Telugu" in tts_lang:
-        voice_option = st.radio("Voice:", options=["👨 Mohan", "👩 Shruti"], horizontal=True, key="v_te")
-    elif "Hindi" in tts_lang:
-        voice_option = st.radio("Voice:", options=["👨 Madhur", "👩 Swara"], horizontal=True, key="v_hi")
-    else:
-        voice_option = st.radio("Voice:", options=["👨 Prabhat", "👩 Neerja"], horizontal=True, key="v_en")
-with col_tts_speed:
-    audio_speed = st.select_slider("Speed:", options=[0.75, 0.85, 1.0, 1.15, 1.25], value=0.85, key="main_tts_speed")
+with st.expander("⚙️ TTS SETTINGS & CONTROLS (Voice, Speed, Pitch & BGM)", expanded=True):
+    col_tts_lang, col_tts_voice = st.columns([0.45, 0.55])
+    
+    with col_tts_lang:
+        tts_lang = st.selectbox("🌐 TTS Language:", options=["Hindi (हिंदी)", "Telugu (తెలుగు)", "English"], key="main_tts_lang_select")
+    with col_tts_voice:
+        if "Telugu" in tts_lang:
+            voice_option = st.radio("Voice:", options=["👨 Mohan", "👩 Shruti"], horizontal=True, key="v_te")
+        elif "Hindi" in tts_lang:
+            voice_option = st.radio("Voice:", options=["👨 Madhur", "👩 Swara"], horizontal=True, key="v_hi")
+        else:
+            voice_option = st.radio("Voice:", options=["👨 Prabhat", "👩 Neerja"], horizontal=True, key="v_en")
+
+    col_opt_speed, col_opt_pitch, col_opt_pause = st.columns(3)
+    with col_opt_speed:
+        audio_speed = st.select_slider("🔊 Play Speed:", options=[0.75, 0.85, 1.0, 1.15, 1.25, 1.5], value=0.85, key="main_tts_speed")
+    with col_opt_pitch:
+        pitch_custom = st.select_slider("🎚️ Voice Pitch/Base:", options=["Normal", "Deep Base", "Heavy Base"], value="Normal", key="main_tts_pitch")
+    with col_opt_pause:
+        pause_duration = st.slider("⏸️ Pause (Sec):", min_value=0.3, max_value=2.0, value=0.5, step=0.1, key="main_tts_pause")
+        
+    col_bgm_1, col_bgm_2 = st.columns([0.4, 0.6])
+    with col_bgm_1:
+        enable_bgm = st.checkbox("🎶 Enable BGM (బ్యాక్‌గ్రౌండ్ మ్యూజిక్)", value=True, key="main_tts_bgm_chk")
+    with col_bgm_2:
+        bgm_volume = st.slider("🎵 BGM Volume (%):", min_value=2, max_value=20, value=6, key="main_tts_bgm_vol")
+
 
 # ==========================================
 # 6. ACTION CONTROLS (ROW 1 & ROW 2)
@@ -329,18 +344,21 @@ with b6:
         st.session_state.main_text = ""
         st.session_state.audio_bytes_data = None
         st.session_state.last_mic_text = ""
+        add_log("Cleared.", "#facc15")
         gc.collect()
         st.rerun()
 
+
 # ==========================================
-# 7. TTS EXECUTION & AUDIO PLAYER
+# 7. సంపూర్ణ TTS జనరేషన్ & BGM మిక్సింగ్ ఇంజిన్
 # ==========================================
 if convert_btn:
     if active_text:
         add_log(f"TTS Started: {tts_lang} ({voice_option})", "#c084fc")
-        with st.spinner("Generating Audio..."):
+        with st.spinner("Generating Voice & Processing Audio..."):
             try:
                 clean_txt = re.sub(r'[*#_~`]', '', active_text)
+                
                 voice_map = {
                     "👨 Mohan": "te-IN-MohanNeural",
                     "👩 Shruti": "te-IN-ShrutiNeural",
@@ -350,37 +368,65 @@ if convert_btn:
                     "👩 Neerja": "en-IN-NeerjaNeural"
                 }
                 selected_voice = voice_map[voice_option]
+
                 rate_str = f"{int((audio_speed - 1.0) * 100):+d}%"
+                pitch_val_map = {
+                    "Normal": "+0Hz",
+                    "Deep Base": "-5Hz",
+                    "Heavy Base": "-10Hz"
+                }
+                pitch_str = pitch_val_map[pitch_custom]
 
                 text_chunks = split_text_into_chunks(clean_txt, max_chars=250)
                 speech_sound = AudioSegment.empty()
-                silence_pause = AudioSegment.silent(duration=400)
+                silence_pause = AudioSegment.silent(duration=int(pause_duration * 1000))
 
                 for i, chunk in enumerate(text_chunks):
                     temp_file = f"temp_tts_{i}.mp3"
                     try:
-                        asyncio.run(generate_voice_file(chunk, selected_voice, "+0Hz", rate_str, temp_file))
+                        asyncio.run(generate_voice_file(chunk, selected_voice, pitch_str, rate_str, temp_file))
                         if os.path.exists(temp_file) and os.path.getsize(temp_file) > 0:
                             chunk_sound = AudioSegment.from_file(temp_file)
                             speech_sound += chunk_sound + silence_pause
                             os.remove(temp_file)
-                    except Exception:
-                        pass
+                    except Exception as ce:
+                        add_log(f"Chunk {i} note: {ce}", "#facc15")
 
                 if len(speech_sound) > 0:
+                    final_sound = speech_sound
+                    
+                    # BGM మిక్సింగ్ లాజిక్
+                    if enable_bgm and os.path.exists("bgm.mp3"):
+                        try:
+                            bgm_sound = AudioSegment.from_file("bgm.mp3")
+                            if len(bgm_sound) < len(speech_sound):
+                                bgm_sound = bgm_sound * ((len(speech_sound) // len(bgm_sound)) + 1)
+                            
+                            bgm_sound = bgm_sound[:len(speech_sound) + 1000]
+                            reduction_db = 22 - (bgm_volume * 1.5)
+                            bgm_sound = bgm_sound - reduction_db
+                            final_sound = speech_sound.overlay(bgm_sound)
+                        except Exception as be:
+                            add_log(f"BGM note: {be}", "#facc15")
+
                     final_fp = io.BytesIO()
-                    speech_sound.export(final_fp, format="mp3")
+                    final_sound.export(final_fp, format="mp3")
                     st.session_state.audio_bytes_data = final_fp.getvalue()
                     add_log("TTS Audio Ready!", "#4ade80")
                     gc.collect()
-                    st.toast("🎉 Ready!")
+                    st.toast("🎉 TTS Audio Ready!")
                 else:
+                    add_log("TTS Failed (Empty Sound)", "#f87171")
                     st.error("❌ Audio Generation Failed.")
+
             except Exception as e:
-                st.error(f"❌ Error: {e}")
+                add_log(f"TTS Error: {e}", "#f87171")
+                st.error("❌ TTS Error:")
+                st.code(traceback.format_exc())
     else:
         st.warning("Please provide text.")
 
+# ఆడియో ప్లేయర్ & డౌన్‌లోడ్
 if st.session_state.audio_bytes_data is not None:
     st.divider()
     st.audio(st.session_state.audio_bytes_data, format="audio/mp3")
@@ -393,6 +439,7 @@ if st.session_state.audio_bytes_data is not None:
         use_container_width=True
     )
 
+# డయాగ్నొస్టిక్స్
 with st.expander("🔍 DIAGNOSTICS", expanded=False):
     log_html = "<div class='diag-box'>"
     for item in st.session_state.diag_logs[-15:]:
