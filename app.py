@@ -14,15 +14,14 @@ import docx
 from streamlit_mic_recorder import speech_to_text
 
 # ==========================================
-# 1. పేజీ సెట్టింగ్స్ & పర్మనెంట్ స్టేట్స్
+# 1. పేజీ సెట్టింగ్స్ & UI స్టైల్స్
 # ==========================================
 st.set_page_config(
-    page_title="ఆధ్యాత్మిక వాయిస్ యంత్రం", 
+    page_title="BRAHMA AI", 
     layout="wide", 
     page_icon="🕉️"
 )
 
-# కస్టమ్ డయాగ్నొస్టిక్స్ & UI స్టైల్స్
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Mandali&display=swap');
@@ -30,21 +29,26 @@ st.markdown("""
     .diag-box {
         background-color: #0f172a;
         color: #38bdf8;
-        border-radius: 10px;
-        padding: 12px;
+        border-radius: 8px;
+        padding: 10px;
         font-family: 'Courier New', Courier, monospace;
-        font-size: 13px;
-        height: 150px;
+        font-size: 12px;
+        height: 130px;
         overflow-y: auto;
         border: 1px solid #334155;
     }
-    .diag-log { margin-bottom: 4px; line-height: 1.4; border-bottom: 1px solid #1e293b; padding-bottom: 2px; }
+    .diag-log { margin-bottom: 3px; line-height: 1.3; border-bottom: 1px solid #1e293b; padding-bottom: 2px; }
     .log-time { color: #94a3b8; font-size: 11px; margin-right: 6px; }
+    
+    /* మొబైల్ బటన్ సైజ్ ఆప్టిమైజేషన్ */
+    div.stButton > button, div.stDownloadButton > button {
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-st.header("🔱 ఆధ్యాత్మిక వాయిస్ సిస్టమ్")
-st.caption("వాయిస్ కన్వర్షన్ (TTS), ఆడియో టు టెక్స్ట్ (STT), DSP వాయిస్ బూస్టర్, HTML అనువాద పేజీ, PDF, Word & Copy - 100% పరిపూర్ణ వ్యవస్థ")
+st.subheader("🕉️ BRAHMA AI : Studio")
 
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
@@ -55,7 +59,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "సిస్టమ్ సిద్ధంగా ఉంది. DSP ఆడియో ఫిల్టర్లు & STT ఇంజిన్ యాక్టివ్‌గా ఉన్నాయి.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. DSP & STT Online.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -68,7 +72,6 @@ def add_log(msg, color="#38bdf8"):
 # ==========================================
 
 def apply_audio_dsp(audio_segment: AudioSegment) -> AudioSegment:
-    """మృదువైన, పల్చటి స్త్రీ గొంతులను స్పష్టంగా మార్చే DSP ఫిల్టర్లు"""
     try:
         processed = high_pass_filter(audio_segment, cutoff=300)
         processed = low_pass_filter(processed, cutoff=3800)
@@ -101,9 +104,9 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="te-IN", enable_dsp=Tru
             text_result = recognizer.recognize_google(audio_data, language=lang_code)
             return text_result
     except sr.UnknownValueError:
-        return "⚠️ ఆడియోలోని మాటలను ఇంజిన్ గుర్తించలేకపోయింది."
+        return "⚠️ Voice not recognized"
     except Exception as e:
-        return f"⚠️ STT ఎర్రర్: {e}"
+        return f"⚠️ Error: {e}"
     finally:
         for p in [temp_in, temp_wav]:
             if os.path.exists(p):
@@ -150,99 +153,72 @@ def create_docx_bytes(text):
 
 def create_printable_pdf_html(text):
     formatted_body = text.replace('\n', '<br>')
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="te">
-    <head>
-        <meta charset="utf-8">
-        <title>Spiritual Note</title>
-        <style>
-            body {{
-                font-family: Arial, sans-serif;
-                font-size: 16px;
-                line-height: 1.6;
-                padding: 30px;
-                color: #000;
-            }}
-            @media print {{
-                body {{ padding: 0; }}
-            }}
-        </style>
-    </head>
-    <body onload="window.print()">
-        <h2>🕉️ ఆధ్యాత్మిక నోట్</h2>
-        <hr>
-        <div>{formatted_body}</div>
-    </body>
-    </html>
-    """
+    html_content = f"""<!DOCTYPE html>
+<html lang="te">
+<head>
+    <meta charset="utf-8">
+    <title>Print Document</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; padding: 25px; color: #000; }}
+        @media print {{ body {{ padding: 0; }} }}
+    </style>
+</head>
+<body onload="window.print()">
+    <div>{formatted_body}</div>
+</body>
+</html>"""
     return html_content
 
 
 # ==========================================
-# 3. ఇన్‌పుట్ విభాగం (డాక్స్, ఆడియో STT & లైవ్ మైక్)
+# 3. ఇన్ పుట్ విభాగం (DOC | STT | MIC)
 # ==========================================
-st.divider()
-c_file, c_audio_stt, c_mic = st.columns([0.34, 0.33, 0.33])
+c_file, c_audio_stt, c_mic = st.columns([0.33, 0.34, 0.33])
 
-# 1. డాక్యుమెంట్ ఫైల్ అప్‌లోడ్
+# 1. DOC / TXT
 with c_file:
-    st.markdown("**📁 మీ ఫైల్‌ను అప్‌లోడ్ చేయండి (.docx, .txt):**")
-    uploaded_file = st.file_uploader(
-        "గరిష్ఠ సైజు 10MB వరకు అనుకూలం", 
-        type=["docx", "txt"],
-        key="doc_file_uploader",
-        help="కేవలం Microsoft Word (.docx) లేదా Text (.txt) ఫైల్స్ మాత్రమే సపోర్ట్ చేయబడతాయి."
-    )
-    
+    st.markdown("**📁 DOC / TXT**")
+    uploaded_file = st.file_uploader("Upload DOCX/TXT", type=["docx", "txt"], key="doc_file_uploader", label_visibility="collapsed")
     if uploaded_file is not None:
-        max_mb = 10
-        if uploaded_file.size > max_mb * 1024 * 1024:
-            st.error(f"⚠️ ఫైల్ సైజు {max_mb} MB కంటే తక్కువగా ఉండాలి!")
-        else:
-            try:
-                f_text = extract_text_from_file(uploaded_file)
-                if f_text and f_text != st.session_state.main_text:
-                    st.session_state.main_text = f_text
-                    add_log(f"డాక్యుమెంట్ లోడ్ అయింది: {uploaded_file.name}", "#4ade80")
-                    st.success(f"✅ '{uploaded_file.name}' విజయవంతంగా లోడ్ అయింది!")
-            except Exception as fe:
-                add_log(f"డాక్యుమెంట్ ఎర్రర్: {fe}", "#f87171")
-                st.error(f"ఫైల్ చదవడంలో లోపం: {fe}")
+        try:
+            f_text = extract_text_from_file(uploaded_file)
+            if f_text and f_text != st.session_state.main_text:
+                st.session_state.main_text = f_text
+                add_log(f"DOC Loaded: {uploaded_file.name}", "#4ade80")
+                st.toast(f"✅ {uploaded_file.name} Loaded!")
+        except Exception as fe:
+            add_log(f"DOC Error: {fe}", "#f87171")
+            st.error(f"Error: {fe}")
 
-# 2. ఆడియో ఫైల్ టు టెక్స్ట్ (Audio STT)
+# 2. AUDIO STT
 with c_audio_stt:
-    st.markdown("**🎵 ఆడియో ఫైల్ టు టెక్స్ట్ (STT):**")
-    uploaded_audio = st.file_uploader(
-        "ఆడియో ఫైల్ (.mp3, .wav, .m4a)", 
-        type=["mp3", "wav", "m4a", "ogg"],
-        key="audio_stt_file_uploader"
-    )
-    use_dsp = st.checkbox("✨ DSP వాయిస్ బూస్టర్ (ఆన్)", value=True)
+    st.markdown("**🎵 AUDIO STT**")
+    uploaded_audio = st.file_uploader("Upload Audio", type=["mp3", "wav", "m4a", "ogg"], key="audio_stt_file_uploader", label_visibility="collapsed")
+    use_dsp = st.checkbox("✨ DSP Booster", value=True)
     
     if uploaded_audio is not None:
-        if st.button("🚀 ఆడియోని టెక్స్ట్‌గా మార్చు", use_container_width=True):
-            add_log(f"ఆడియో ప్రాసెసింగ్ ప్రారంభం: {uploaded_audio.name}", "#c084fc")
-            with st.spinner("ఆడియోను టెక్స్ట్‌గా మారుస్తోంది... దయచేసి వేచి ఉండండి..."):
+        if st.button("🚀 RUN STT", use_container_width=True):
+            add_log(f"STT Started: {uploaded_audio.name}", "#c084fc")
+            with st.spinner("Processing STT..."):
                 transcribed_txt = transcribe_audio_file(uploaded_audio, lang_code="te-IN", enable_dsp=use_dsp)
                 if transcribed_txt and not transcribed_txt.startswith("⚠️"):
                     st.session_state.main_text = (st.session_state.main_text + " " + transcribed_txt).strip()
-                    add_log(f"టెక్స్ట్ గుర్తించబడింది ({len(transcribed_txt)} అక్షరాలు)", "#4ade80")
-                    st.success("✅ ఆడియో విజయవంతంగా టెక్స్ట్‌గా మార్చబడింది!")
+                    add_log(f"STT Success ({len(transcribed_txt)} chars)", "#4ade80")
+                    st.toast("✅ STT Complete!")
                     st.rerun()
                 else:
-                    add_log(f"STT లోపం: {transcribed_txt}", "#f87171")
+                    add_log(f"STT Error: {transcribed_txt}", "#f87171")
                     st.error(transcribed_txt)
 
-# 3. లైవ్ మైక్రోఫోన్
+# 3. LIVE MIC
 with c_mic:
-    st.markdown("**🎙️ మైక్రోఫోన్ ద్వారా మాట్లాడండి (Live Voice Typing):**")
-    mic_lang = st.selectbox("మాట్లాడే భాష:", options=["తెలుగు (Telugu)", "హిందీ (Hindi)", "ఇంగ్లీష్ (English)"])
-    mic_code_map = {"తెలుగు (Telugu)": "te-IN", "హిందీ (Hindi)": "hi-IN", "ఇంగ్లీష్ (English)": "en-IN"}
+    st.markdown("**🎙️ LIVE MIC**")
+    mic_lang = st.selectbox("Lang:", options=["TE (తెలుగు)", "HI (हिंदी)", "EN (English)"], label_visibility="collapsed")
+    mic_code_map = {"TE (తెలుగు)": "te-IN", "HI (हिंदी)": "hi-IN", "EN (English)": "en-IN"}
     
     spoken_result = speech_to_text(
-        start_prompt="🎙️ మాట్లాడటం ప్రారంభించండి (Start)",
-        stop_prompt="⏹️ ఆపండి (Stop)",
+        start_prompt="🎙️ START",
+        stop_prompt="⏹️ STOP",
         language=mic_code_map[mic_lang],
         use_container_width=True,
         key='perfect_mic_recorder'
@@ -251,28 +227,31 @@ with c_mic:
     if spoken_result and spoken_result != st.session_state.last_mic_text:
         st.session_state.main_text = (st.session_state.main_text + " " + spoken_result).strip()
         st.session_state.last_mic_text = spoken_result
-        add_log(f"లైవ్ మాట: '{spoken_result}'", "#4ade80")
+        add_log(f"MIC: '{spoken_result}'", "#4ade80")
         st.rerun()
 
 # ==========================================
-# 4. డయాగ్నొస్టిక్స్ మానిటర్ కన్సోల్
+# 4. DIAGNOSTICS CONSOLE
 # ==========================================
-with st.expander("🔍 లైవ్ డయాగ్నొస్టిక్స్ & ఈవెంట్ మానిటర్ (Diagnostics Console)", expanded=True):
+with st.expander("🔍 DIAGNOSTICS", expanded=False):
     log_html = "<div class='diag-box'>"
     for item in st.session_state.diag_logs[-15:]:
         log_html += f"<div class='diag-log'><span class='log-time'>[{item['time']}]</span> <span style='color:{item['color']};'>{item['msg']}</span></div>"
     log_html += "</div>"
     st.markdown(log_html, unsafe_allow_html=True)
-    if st.button("🗑️ లాగ్స్ క్లియర్ చేయి"):
-        st.session_state.diag_logs = [{"time": datetime.now().strftime("%H:%M:%S"), "msg": "లాగ్స్ క్లియర్ చేయబడ్డాయి.", "color": "#38bdf8"}]
+    if st.button("🗑️ CLEAR LOGS", use_container_width=True):
+        st.session_state.diag_logs = [{"time": datetime.now().strftime("%H:%M:%S"), "msg": "Logs cleared.", "color": "#38bdf8"}]
         st.rerun()
 
-# ప్రధాన టెక్స్ట్ ఏరియా
+# ==========================================
+# 5. MAIN TEXT EDITOR
+# ==========================================
 user_input_text = st.text_area(
-    "ఆడియో/ఫైల్స్‌గా మార్చాలనుకుంటున్న టెక్స్ట్:", 
+    "Content Editor", 
     value=st.session_state.main_text, 
-    height=180,
-    placeholder="ఇక్కడ టెక్స్ట్ పేస్ట్ చేయండి లేదా పైన ఉన్న మైక్రోఫోన్ / ఫైల్ అప్‌లోడ్ ఉపయోగించండి..."
+    height=160,
+    placeholder="Text content here...",
+    label_visibility="collapsed"
 )
 
 if user_input_text != st.session_state.main_text:
@@ -280,145 +259,115 @@ if user_input_text != st.session_state.main_text:
 
 
 # ==========================================
-# 5. ఆడియో ఎంపికలు & ఆప్షనల్ కంట్రోల్స్
+# 6. ACTION CONTROLS (ROW 1 & ROW 2)
 # ==========================================
-st.divider()
-col_lang, col_voice = st.columns([0.5, 0.5])
-
-with col_lang:
-    selected_lang = st.selectbox("🌐 ఆడియో భాషను ఎంచుకోండి:", options=["తెలుగు (Telugu)", "హిందీ (Hindi)", "ఇంగ్లీష్ (English)"])
-
-with col_voice:
-    if "తెలుగు" in selected_lang:
-        voice_option = st.radio("🎙️ స్వరాన్ని ఎంచుకోండి:", options=["👨 మోహన్ (పురుష)", "👩 శ్రుతి (స్త్రీ)"], horizontal=True)
-    elif "హిందీ" in selected_lang:
-        voice_option = st.radio("🎙️ స్వరాన్ని ఎంచుకోండి:", options=["👨 మధుర్ (పురుష)", "👩 స్వర్ణ (స్త్రీ)"], horizontal=True)
-    else:
-        voice_option = st.radio("🎙️ స్వరాన్ని ఎంచుకోండి:", options=["👨 ప్రభాత్ (పురుష)", "👩 నీరజ (స్త్రీ)"], horizontal=True)
-
-# 🎛️ ఆప్షనల్ ఆడియో సెట్టింగ్స్
-with st.expander("⚙️ ఆప్షనల్ ఆడియో సెట్టింగ్స్ (స్పీడ్, పిచ్ & BGM ఫైన్-ట్యూనింగ్)"):
-    col_opt_speed, col_opt_pitch, col_opt_pause = st.columns(3)
-    
-    with col_opt_speed:
-        audio_speed = st.select_slider("🔊 ప్లే స్పీడ్ (Play Speed):", options=[0.75, 0.85, 1.0, 1.15, 1.25, 1.5], value=0.85)
-    
-    with col_opt_pitch:
-        pitch_custom = st.select_slider("🎚️ వాయిస్ గంభీరత (Pitch/Base):", options=["సాధారణ (Normal)", "గంభీరం (Deep Base)", "అత్యంత గంభీరం (Heavy Base)"], value="సాధారణ (Normal)")
-        
-    with col_opt_pause:
-        pause_duration = st.slider("⏸️ వాక్యాల మధ్య విరామం (Pause Sec):", min_value=0.3, max_value=2.0, value=0.6, step=0.1)
-        
-    col_bgm_1, col_bgm_2 = st.columns([0.4, 0.6])
-    with col_bgm_1:
-        enable_bgm = st.checkbox("🎶 BGM (బ్యాక్‌గ్రౌండ్ మ్యూజిక్) జోడించు", value=True)
-    with col_bgm_2:
-        bgm_volume = st.slider("🎵 BGM శబ్దం (Volume %):", min_value=2, max_value=20, value=6)
-
-
-# ==========================================
-# 6. ఆరు ప్రధాన ఆప్షన్ల వరుస (Action Controls)
-# ==========================================
-st.markdown("##### 🎯 యాక్షన్ కంట్రోల్స్ (Action Controls)")
-
 active_text = st.session_state.main_text.strip()
 
-c1, c2, c3, c4, c5, c6 = st.columns([0.18, 0.18, 0.16, 0.16, 0.16, 0.16])
+# బటన్లను మొబైల్‌లో 3 + 3 గ్రిడ్‌గా అమర్చాం
+b1, b2, b3 = st.columns(3)
+b4, b5, b6 = st.columns(3)
 
-# 1. 🔊 ఆడియో బటన్
-with c1:
-    convert_btn = st.button("🔊 ఆడియో చేయి", type="primary", use_container_width=True)
+# Row 1
+with b1:
+    convert_btn = st.button("🔊 TTS", type="primary", use_container_width=True)
 
-# 2. 🌐 HTML ట్రాన్స్‌లేట్ పేజీ (బ్రౌజర్‌లో ఆటో-ట్రాన్స్‌లేట్ కోసం)
-with c2:
+with b2:
     if active_text:
         html_trans_page = f"<!DOCTYPE html><html><head><meta charset='utf-8'></head><body><p style='font-size:18px; line-height:1.6;'>{active_text.replace(chr(10), '<br>')}</p></body></html>"
-        st.download_button(
-            label="🌐 HTML (ట్రాన్స్‌లేట్)",
-            data=html_trans_page.encode('utf-8'),
-            file_name="translate_page.html",
-            mime="text/html",
-            use_container_width=True,
-            help="బ్రౌజర్‌లో ఓపెన్ చేసి సులభంగా అనువదించుకోవచ్చు"
-        )
+        st.download_button("🌐 HTML", data=html_trans_page.encode('utf-8'), file_name="translate_page.html", mime="text/html", use_container_width=True)
     else:
-        st.button("🌐 HTML (ట్రాన్స్‌లేట్)", disabled=True, use_container_width=True)
+        st.button("🌐 HTML", disabled=True, use_container_width=True)
 
-# 3. 📄 ప్రింటబుల్ PDF
-with c3:
+with b3:
     if active_text:
         printable_pdf = create_printable_pdf_html(active_text)
-        st.download_button(
-            label="📄 PDF ఫైల్",
-            data=printable_pdf.encode('utf-8'),
-            file_name="spiritual_note.html",
-            mime="text/html",
-            use_container_width=True,
-            help="డైరెక్ట్‌గా ప్రింట్ లేదా PDF గా సేవ్ అవుతుంది"
-        )
+        st.download_button("📄 PDF", data=printable_pdf.encode('utf-8'), file_name="note.html", mime="text/html", use_container_width=True)
     else:
-        st.button("📄 PDF ఫైల్", disabled=True, use_container_width=True)
+        st.button("📄 PDF", disabled=True, use_container_width=True)
 
-# 4. 📝 Word (.docx) బటన్
-with c4:
+# Row 2
+with b4:
     if active_text:
         docx_data = create_docx_bytes(active_text)
-        st.download_button(
-            label="📝 Word ఫైల్",
-            data=docx_data,
-            file_name="spiritual_note.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            use_container_width=True
-        )
+        st.download_button("📝 DOCX", data=docx_data, file_name="note.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
     else:
-        st.button("📝 Word ఫైల్", disabled=True, use_container_width=True)
+        st.button("📝 DOCX", disabled=True, use_container_width=True)
 
-# 5. 📋 కాపీ బటన్
-with c5:
+with b5:
     if active_text:
-        if st.button("📋 కాపీ", use_container_width=True):
+        if st.button("📋 COPY", use_container_width=True):
             st.code(active_text, language=None)
-            add_log("టెక్స్ట్ క్లిప్‌బోర్డ్‌కు సిద్ధమైంది.", "#facc15")
-            st.toast("✅ పైన ఉన్న టెక్స్ట్‌ని క్లిక్ చేసి కాపీ చేసుకోండి!", icon="📋")
+            add_log("Text ready to copy.", "#facc15")
+            st.toast("✅ Ready to copy!", icon="📋")
     else:
-        st.button("📋 కాపీ", disabled=True, use_container_width=True)
+        st.button("📋 COPY", disabled=True, use_container_width=True)
 
-# 6. 🧹 క్లియర్ బటన్
-with c6:
-    if st.button("🧹 క్లియర్", use_container_width=True):
+with b6:
+    if st.button("🧹 CLEAR", use_container_width=True):
         st.session_state.main_text = ""
         st.session_state.audio_bytes_data = None
         st.session_state.last_mic_text = ""
-        add_log("డేటా క్లియర్ చేయబడింది.", "#facc15")
+        add_log("Cleared.", "#facc15")
         gc.collect()
         st.rerun()
 
 
 # ==========================================
-# 7. హై-స్పీడ్ TTS ఆడియో ప్రాసెసింగ్ లాజిక్
+# 7. VOICE & AUDIO SETTINGS
+# ==========================================
+with st.expander("⚙️ SETTINGS (Voice, Speed, Pitch & BGM)", expanded=False):
+    col_lang, col_voice = st.columns(2)
+    with col_lang:
+        selected_lang = st.selectbox("Language:", options=["Telugu", "Hindi", "English"])
+
+    with col_voice:
+        if "Telugu" in selected_lang:
+            voice_option = st.radio("Voice:", options=["👨 Mohan", "👩 Shruti"], horizontal=True)
+        elif "Hindi" in selected_lang:
+            voice_option = st.radio("Voice:", options=["👨 Madhur", "👩 Swara"], horizontal=True)
+        else:
+            voice_option = st.radio("Voice:", options=["👨 Prabhat", "👩 Neerja"], horizontal=True)
+
+    col_opt_speed, col_opt_pitch, col_opt_pause = st.columns(3)
+    with col_opt_speed:
+        audio_speed = st.select_slider("Speed:", options=[0.75, 0.85, 1.0, 1.15, 1.25, 1.5], value=0.85)
+    with col_opt_pitch:
+        pitch_custom = st.select_slider("Pitch:", options=["Normal", "Deep Base", "Heavy Base"], value="Normal")
+    with col_opt_pause:
+        pause_duration = st.slider("Pause (Sec):", min_value=0.3, max_value=2.0, value=0.6, step=0.1)
+        
+    col_bgm_1, col_bgm_2 = st.columns([0.4, 0.6])
+    with col_bgm_1:
+        enable_bgm = st.checkbox("🎶 Enable BGM", value=True)
+    with col_bgm_2:
+        bgm_volume = st.slider("BGM Vol (%):", min_value=2, max_value=20, value=6)
+
+
+# ==========================================
+# 8. TTS ENGINE
 # ==========================================
 if convert_btn:
     if active_text:
-        add_log("TTS ప్రాసెసింగ్ మొదలైంది...", "#c084fc")
-        with st.spinner("ఆడియో వేగంగా ప్రాసెస్ అవుతోంది... దయచేసి వేచి ఉండండి..."):
+        add_log("TTS Processing...", "#c084fc")
+        with st.spinner("Generating Voice..."):
             try:
                 clean_txt = re.sub(r'[*#_~`]', '', active_text)
                 
                 voice_map = {
-                    "👨 మోహన్ (పురుష)": "te-IN-MohanNeural",
-                    "👩 శ్రుతి (స్త్రీ)": "te-IN-ShrutiNeural",
-                    "👨 మధుర్ (పురుష)": "hi-IN-MadhurNeural",
-                    "👩 స్వర్ణ (స్త్రీ)": "hi-IN-SwaraNeural",
-                    "👨 ప్రభాత్ (పురుష)": "en-IN-PrabhatNeural",
-                    "👩 నీరజ (స్త్రీ)": "en-IN-NeerjaNeural"
+                    "👨 Mohan": "te-IN-MohanNeural",
+                    "👩 Shruti": "te-IN-ShrutiNeural",
+                    "👨 Madhur": "hi-IN-MadhurNeural",
+                    "👩 Swara": "hi-IN-SwaraNeural",
+                    "👨 Prabhat": "en-IN-PrabhatNeural",
+                    "👩 Neerja": "en-IN-NeerjaNeural"
                 }
                 selected_voice = voice_map[voice_option]
 
                 rate_str = f"{int((audio_speed - 1.0) * 100):+d}%"
                 pitch_val_map = {
-                    "సాధారణ (Normal)": "+0Hz",
-                    "గంభీరం (Deep Base)": "-5Hz",
-                    "అత్యంత గంభీరం (Heavy Base)": "-10Hz"
+                    "Normal": "+0Hz",
+                    "Deep Base": "-5Hz",
+                    "Heavy Base": "-10Hz"
                 }
                 pitch_str = pitch_val_map[pitch_custom]
 
@@ -455,28 +404,28 @@ if convert_btn:
                     final_fp = io.BytesIO()
                     final_sound.export(final_fp, format="mp3")
                     st.session_state.audio_bytes_data = final_fp.getvalue()
-                    add_log("TTS ఆడియో ఫైల్ సిద్ధమైంది!", "#4ade80")
+                    add_log("TTS Complete!", "#4ade80")
                     gc.collect()
-                    st.success("🎉 ఆడియో విజయవంతంగా సిద్ధమైంది!")
+                    st.toast("🎉 TTS Ready!")
                 else:
-                    add_log("ఆడియో జనరేషన్ విఫలమైంది.", "#f87171")
-                    st.error("❌ ఆడియో డేటా ఏదీ జనరేట్ కాలేదు!")
+                    add_log("TTS Failed.", "#f87171")
+                    st.error("❌ Audio Generation Failed")
 
             except Exception as e:
-                add_log(f"TTS లోపం: {e}", "#f87171")
-                st.error("❌ ఆడియో సిస్టమ్‌లో లోపం వచ్చింది:")
+                add_log(f"TTS Error: {e}", "#f87171")
+                st.error("❌ TTS Error:")
                 st.code(traceback.format_exc())
     else:
-        st.warning("దయచేసి టెక్స్ట్ ఎంటర్ చేయండి లేదా మాట్లాడండి.")
+        st.warning("Please enter text or record audio.")
 
-# 📥 స్థిరమైన ఆడియో ప్లేయర్ & డౌన్‌లోడ్
+# AUDIO PLAYER & DOWNLOAD
 if st.session_state.audio_bytes_data is not None:
     st.divider()
     st.audio(st.session_state.audio_bytes_data, format="audio/mp3")
     st.download_button(
-        label="📥 MP3 ఆడియో ఫైల్‌ని డౌన్‌లోడ్ చేయండి", 
+        label="📥 DOWNLOAD MP3", 
         data=st.session_state.audio_bytes_data, 
-        file_name="spiritual_audio.mp3", 
+        file_name="audio.mp3", 
         mime="audio/mp3",
         key="permanent_download_btn",
         use_container_width=True
