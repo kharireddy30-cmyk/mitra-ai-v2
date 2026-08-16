@@ -14,7 +14,7 @@ import docx
 from streamlit_mic_recorder import speech_to_text
 
 # ==========================================
-# 1. పేజీ సెట్టింగ్స్ & UI స్టైల్స్
+# 1. పేజీ సెట్టింగ్స్ & మొబైల్ స్టైల్స్
 # ==========================================
 st.set_page_config(
     page_title="BRAHMA AI", 
@@ -40,7 +40,6 @@ st.markdown("""
     .diag-log { margin-bottom: 3px; line-height: 1.3; border-bottom: 1px solid #1e293b; padding-bottom: 2px; }
     .log-time { color: #94a3b8; font-size: 11px; margin-right: 6px; }
     
-    /* మొబైల్ బటన్ సైజ్ ఆప్టిమైజేషన్ */
     div.stButton > button, div.stDownloadButton > button {
         font-weight: 600 !important;
         border-radius: 8px !important;
@@ -59,7 +58,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. DSP & STT Online.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Android & Laptop DSP Active.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -68,7 +67,7 @@ def add_log(msg, color="#38bdf8"):
 
 
 # ==========================================
-# 2. కోర్ హెల్పర్ & DSP ఫంక్షన్లు
+# 2. మొబైల్ & డెస్క్‌టాప్ ఆప్టిమైజ్డ్ DSP & STT ఇంజిన్
 # ==========================================
 
 def apply_audio_dsp(audio_segment: AudioSegment) -> AudioSegment:
@@ -83,14 +82,22 @@ def apply_audio_dsp(audio_segment: AudioSegment) -> AudioSegment:
 
 def transcribe_audio_file(uploaded_audio_file, lang_code="te-IN", enable_dsp=True):
     uploaded_audio_file.seek(0)
-    temp_in = "temp_stt_in.audio"
+    
+    # మొబైల్ ఫైల్ అసలైన ఎక్స్‌టెన్షన్‌ను సంగ్రహించడం (.m4a, .aac, .mp3, etc.)
+    file_ext = os.path.splitext(uploaded_audio_file.name)[1].lower()
+    if not file_ext:
+        file_ext = ".m4a"
+        
+    temp_in = f"temp_stt_in{file_ext}"
     temp_wav = "temp_stt_out.wav"
     
     with open(temp_in, "wb") as f:
         f.write(uploaded_audio_file.read())
 
     try:
+        # ఆడియోను రీడ్ చేసి 16kHz మోనో WAV లోకి కన్వర్ట్ చేయడం
         sound = AudioSegment.from_file(temp_in)
+        
         if enable_dsp:
             sound = apply_audio_dsp(sound)
         
@@ -99,18 +106,21 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="te-IN", enable_dsp=Tru
 
         recognizer = sr.Recognizer()
         with sr.AudioFile(temp_wav) as source:
-            recognizer.adjust_for_ambient_noise(source, duration=0.5)
+            recognizer.adjust_for_ambient_noise(source, duration=0.3)
             audio_data = recognizer.record(source)
             text_result = recognizer.recognize_google(audio_data, language=lang_code)
             return text_result
     except sr.UnknownValueError:
-        return "⚠️ Voice not recognized"
+        return "⚠️ Voice not recognized. Please speak clearly."
     except Exception as e:
-        return f"⚠️ Error: {e}"
+        return f"⚠️ Mobile Audio Error: {e}"
     finally:
         for p in [temp_in, temp_wav]:
             if os.path.exists(p):
-                os.remove(p)
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
 
 async def generate_voice_file(text, voice, pitch_val, rate_val, output_filename):
     communicate = edge_tts.Communicate(text, voice, pitch=pitch_val, rate=rate_val)
@@ -157,7 +167,7 @@ def create_printable_pdf_html(text):
 <html lang="te">
 <head>
     <meta charset="utf-8">
-    <title>Print Document</title>
+    <title>Document</title>
     <style>
         body {{ font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; padding: 25px; color: #000; }}
         @media print {{ body {{ padding: 0; }} }}
@@ -171,7 +181,7 @@ def create_printable_pdf_html(text):
 
 
 # ==========================================
-# 3. ఇన్ పుట్ విభాగం (DOC | STT | MIC)
+# 3. ఇన్‌పుట్ విభాగం (DOC | STT | MIC)
 # ==========================================
 c_file, c_audio_stt, c_mic = st.columns([0.33, 0.34, 0.33])
 
@@ -190,16 +200,16 @@ with c_file:
             add_log(f"DOC Error: {fe}", "#f87171")
             st.error(f"Error: {fe}")
 
-# 2. AUDIO STT
+# 2. AUDIO STT (మొబైల్ ఫైల్స్ సపోర్ట్)
 with c_audio_stt:
     st.markdown("**🎵 AUDIO STT**")
-    uploaded_audio = st.file_uploader("Upload Audio", type=["mp3", "wav", "m4a", "ogg"], key="audio_stt_file_uploader", label_visibility="collapsed")
+    uploaded_audio = st.file_uploader("Upload Audio", type=["mp3", "wav", "m4a", "ogg", "aac", "opus", "3gp"], key="audio_stt_file_uploader", label_visibility="collapsed")
     use_dsp = st.checkbox("✨ DSP Booster", value=True)
     
     if uploaded_audio is not None:
         if st.button("🚀 RUN STT", use_container_width=True):
             add_log(f"STT Started: {uploaded_audio.name}", "#c084fc")
-            with st.spinner("Processing STT..."):
+            with st.spinner("Processing Audio..."):
                 transcribed_txt = transcribe_audio_file(uploaded_audio, lang_code="te-IN", enable_dsp=use_dsp)
                 if transcribed_txt and not transcribed_txt.startswith("⚠️"):
                     st.session_state.main_text = (st.session_state.main_text + " " + transcribed_txt).strip()
@@ -263,7 +273,6 @@ if user_input_text != st.session_state.main_text:
 # ==========================================
 active_text = st.session_state.main_text.strip()
 
-# బటన్లను మొబైల్‌లో 3 + 3 గ్రిడ్‌గా అమర్చాం
 b1, b2, b3 = st.columns(3)
 b4, b5, b6 = st.columns(3)
 
