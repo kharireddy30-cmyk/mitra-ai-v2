@@ -12,11 +12,10 @@ import traceback
 from datetime import datetime
 import docx
 from streamlit_mic_recorder import speech_to_text
-import urllib.request
-import json
+from services.groq_polisher import polish_speech_script
 
 # ==========================================
-# 1. పేజీ సెట్టింగ్స్ & కాంపాక్ట్ UI
+# 1. పేజీ సెట్టింగ్స్ & UI స్టైల్స్
 # ==========================================
 st.set_page_config(
     page_title="BRAHMA AI", 
@@ -29,7 +28,6 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Mandali&display=swap');
     * { font-family: 'Mandali', 'Segoe UI', Tahoma, sans-serif; }
-    
     .block-container { padding-top: 1rem; padding-bottom: 2rem; }
     div.stButton > button, div.stDownloadButton > button {
         font-weight: 600 !important;
@@ -50,7 +48,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.subheader("🕉️ BRAHMA AI : Studio (Auto Polish STT & TTS)")
+st.subheader("🕉️ BRAHMA AI : Studio (Groq AI Polisher & TTS)")
 
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
@@ -61,7 +59,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Auto AI Polish Enabled.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Groq AI Speech Scriptwriter Active.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -70,74 +68,7 @@ def add_log(msg, color="#38bdf8"):
 
 
 # ==========================================
-# 2. అధునాతన AI స్క్రిప్ట్ ఎడిటర్ & పాలిషర్
-# ==========================================
-
-def polish_text_with_groq(text):
-    """STT ద్వారా వచ్చిన టెక్స్ట్‌లోని అక్షర దోషాలను సరిచేసి, అందమైన పంక్చుయేషన్ & పేరాగ్రాఫ్‌లుగా మార్చే AI ఇంజిన్"""
-    groq_key = st.secrets.get("GROQ_API_KEY", "")
-    
-    if not groq_key:
-        return fallback_rule_based_polish(text)
-    
-    prompt = f"""You are a master Telugu, Hindi, and English linguistic editor and speech scriptwriter.
-Task:
-1. Fix subtle speech-to-text spelling/grammar errors (e.g., 'రెండు చేద్దాం' -> 'రండి చేద్దాం', 'సర్వేజనా' -> 'సర్వేజనాః/సర్వేజనా', etc.).
-2. Add natural punctuation (commas, full stops, ellipsis '...') and paragraph line breaks so that Text-to-Speech (TTS) sounds like a professional human announcement/speech.
-3. Preserve the exact original core meaning, context, and language.
-4. Output ONLY the polished and formatted final script without any conversational filler, meta text, or markdown code blocks.
-
-Raw Input Text:
-{text}
-"""
-    
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {groq_key}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.2
-    }
-    
-    try:
-        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers, method='POST')
-        with urllib.request.urlopen(req, timeout=12) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
-            polished = res_data['choices'][0]['message']['content'].strip()
-            return polished
-    except Exception as e:
-        add_log(f"Auto-Polish Note: {e}", "#facc15")
-        return fallback_rule_based_polish(text)
-
-def fallback_rule_based_polish(text):
-    clean_txt = re.sub(r'\s+', ' ', text).strip()
-    connectors = ["అయితే", "మరియు", "కానీ", "కాబట్టి", "అందువల్ల", "ఎందుకంటే", "అలాగే", "మరోవైపు", "తో పాటు", "తర్వాత"]
-    for c in connectors:
-        clean_txt = clean_txt.replace(f" {c} ", f", {c} ")
-        
-    hi_connectors = ["और", "लेकिन", "इसलिए", "क्योंकि", "तो", "परंतु", "तथा"]
-    for hc in hi_connectors:
-        clean_txt = clean_txt.replace(f" {hc} ", f", {hc} ")
-
-    words = clean_txt.split(" ")
-    formatted_chunks = []
-    curr = []
-    for w in words:
-        curr.append(w)
-        if len(curr) >= 14 or w.endswith((".", "।", "!", "?")):
-            formatted_chunks.append(" ".join(curr))
-            curr = []
-    if curr:
-        formatted_chunks.append(" ".join(curr))
-        
-    return ".\n\n".join(formatted_chunks) + ("." if not clean_txt.endswith((".", "।")) else "")
-
-
-# ==========================================
-# 3. కోర్ DSP, STT & డాక్యుమెంట్ ఇంజిన్
+# 2. కోర్ DSP, STT & డాక్యుమెంట్ ఇంజిన్
 # ==========================================
 
 def detect_chunk_language(text):
@@ -210,8 +141,8 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="auto", enable_dsp=True
 
         if full_transcript:
             raw_text = " ".join(full_transcript)
-            # ఆడియో STT పూర్తికాగానే నేరుగా ఇక్కడే AI ద్వారా సరిచేయడం
-            polished_text = polish_text_with_groq(raw_text)
+            # Groq AI ద్వారా నేరుగా శ్రావ్యమైన స్క్రిప్ట్‌గా మార్చడం
+            polished_text = polish_speech_script(raw_text)
             return polished_text
         else:
             return "⚠️ Voice not recognized. Try selecting a specific language."
@@ -229,18 +160,21 @@ async def generate_voice_file(text, voice, pitch_val, rate_val, output_filename)
     communicate = edge_tts.Communicate(text, voice, pitch=pitch_val, rate=rate_val)
     await communicate.save(output_filename)
 
-def split_text_into_chunks(text, max_chars=250):
-    clean_text = re.sub(r'\s+', ' ', text).strip()
+def split_text_into_chunks(text, max_chars=200):
+    clean_text = re.sub(r'[\r]+', '', text).strip()
     if not clean_text:
         return []
-    raw_sentences = re.split(r'(?<=[.!?\n।])\s+', clean_text)
+    # కొత్త లైన్ లేదా విరామ చిహ్నాలు ఆధారంగా ముక్కలు చేయడం
+    raw_sentences = re.split(r'(?<=[.!?\n।])\s+|(?<=\.\.\.)\s+', clean_text)
     chunks = []
     for sentence in raw_sentences:
-        if len(sentence) <= max_chars:
-            if sentence.strip():
-                chunks.append(sentence.strip())
+        s_clean = sentence.strip()
+        if not s_clean:
+            continue
+        if len(s_clean) <= max_chars:
+            chunks.append(s_clean)
         else:
-            words = sentence.split(' ')
+            words = s_clean.split(' ')
             curr_chunk = ""
             for word in words:
                 if len(curr_chunk) + len(word) + 1 <= max_chars:
@@ -274,13 +208,13 @@ def create_docx_bytes(text):
 
 def create_printable_pdf_html(text):
     formatted_body = text.replace('\n', '<br>')
-    return f"""<!DOCTYPE html><html lang="te"><head><meta charset="utf-8"><title>Print</title>
-    <style>body {{ font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6; padding: 20px; }}</style></head>
+    return f"""<!DOCTYPE html><html lang="te"><head><meta charset="utf-8"><title>Speech Script</title>
+    <style>body {{ font-family: Arial, sans-serif; font-size: 17px; line-height: 1.8; padding: 25px; color: #000; }}</style></head>
     <body onload="window.print()"><div>{formatted_body}</div></body></html>"""
 
 
 # ==========================================
-# 4. ఇన్‌పుట్ విభాగాలు (DOC | AUDIO | MIC)
+# 3. ఇన్‌పుట్ విభాగాలు (DOC | AUDIO | MIC)
 # ==========================================
 with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
     c_file, c_audio_stt, c_mic = st.columns([0.33, 0.34, 0.33])
@@ -292,9 +226,11 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             try:
                 f_text = extract_text_from_file(uploaded_file)
                 if f_text and f_text != st.session_state.main_text:
-                    st.session_state.main_text = f_text
-                    add_log(f"DOC Loaded: {uploaded_file.name}", "#4ade80")
-                    st.toast(f"✅ {uploaded_file.name} Loaded!")
+                    with st.spinner("AI Speech Formatting..."):
+                        polished = polish_speech_script(f_text)
+                        st.session_state.main_text = polished if polished else f_text
+                    add_log(f"DOC Loaded & Polished: {uploaded_file.name}", "#4ade80")
+                    st.toast(f"✅ {uploaded_file.name} Loaded & Formatted!")
             except Exception as fe:
                 st.error(f"Error: {fe}")
 
@@ -310,12 +246,12 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             use_dsp = st.checkbox("✨ DSP Booster", value=True, key="stt_dsp_chk")
             if st.button("🚀 RUN STT", use_container_width=True):
                 add_log(f"STT Started: {uploaded_audio.name} ({stt_lang_choice})", "#c084fc")
-                with st.spinner("Processing & AI Polishing Script... Please wait..."):
+                with st.spinner("Transcribing & AI Speech Scripting..."):
                     transcribed_txt = transcribe_audio_file(uploaded_audio, lang_code=selected_stt_lang, enable_dsp=use_dsp)
                     if transcribed_txt and not transcribed_txt.startswith("⚠️"):
                         st.session_state.main_text = transcribed_txt.strip()
-                        add_log(f"STT & Polish Complete ({len(transcribed_txt)} chars)", "#4ade80")
-                        st.toast("✅ ఆడియో టెక్స్ట్‌గా మారి అందంగా తీర్చబడింది!")
+                        add_log(f"STT & Script Ready ({len(transcribed_txt)} chars)", "#4ade80")
+                        st.toast("✅ స్క్రిప్ట్ సిద్ధమైంది!")
                         st.rerun()
                     else:
                         st.error(transcribed_txt)
@@ -332,22 +268,38 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             key='mic_rec'
         )
         if spoken_result and spoken_result != st.session_state.last_mic_text:
-            polished_live = polish_text_with_groq(spoken_result)
-            st.session_state.main_text = (st.session_state.main_text + "\n\n" + polished_live).strip()
+            with st.spinner("AI Speech Formatting..."):
+                polished_live = polish_speech_script(spoken_result)
+                st.session_state.main_text = (st.session_state.main_text + "\n\n" + (polished_live if polished_live else spoken_result)).strip()
             st.session_state.last_mic_text = spoken_result
             add_log(f"MIC: '{spoken_result}' (Polished)", "#4ade80")
             st.rerun()
 
 
 # ==========================================
-# 5. MAIN TEXT CONTENT
+# 4. MAIN TEXT CONTENT & RE-POLISH BAR
 # ==========================================
-st.markdown("##### 📝 టెక్స్ట్ ఎడిటర్ (Formatted Speech Script)")
+col_hdr, col_polish = st.columns([0.65, 0.35])
+with col_hdr:
+    st.markdown("##### 📝 స్పీచ్ స్క్రిప్ట్ ఎడిటర్ (Speech Script)")
+with col_polish:
+    if st.button("✨ స్క్రిప్ట్ మార్చు (Re-Polish AI)", use_container_width=True, help="మరోసారి బ్రేకులు, విరామాలు సరిచేస్తుంది"):
+        if st.session_state.main_text.strip():
+            with st.spinner("Groq AI ద్వారా స్క్రిప్ట్ తీర్చిదిద్దుతోంది..."):
+                polished = polish_speech_script(st.session_state.main_text)
+                if polished:
+                    st.session_state.main_text = polished
+                    add_log("స్క్రిప్ట్ విజయవంతంగా రీ-పాలిష్ చేయబడింది!", "#38bdf8")
+                    st.toast("✨ శ్రావ్యమైన స్క్రిప్ట్ సిద్ధమైంది!", icon="✨")
+                    st.rerun()
+        else:
+            st.warning("దయచేసి ముందుగా టెక్స్ట్‌ను ఎంటర్ చేయండి.")
+
 user_input_text = st.text_area(
     "Content Editor", 
     value=st.session_state.main_text, 
-    height=160,
-    placeholder="Text content appears here...",
+    height=170,
+    placeholder="Formatted speech script appears here...",
     label_visibility="collapsed"
 )
 if user_input_text != st.session_state.main_text:
@@ -355,7 +307,7 @@ if user_input_text != st.session_state.main_text:
 
 
 # ==========================================
-# 6. TTS SETTINGS & CONTROLS
+# 5. TTS SETTINGS & CONTROLS
 # ==========================================
 with st.expander("⚙️ TTS SETTINGS & CONTROLS (Multi-Language Auto Support)", expanded=True):
     col_tts_lang, col_tts_voice = st.columns([0.45, 0.55])
@@ -372,7 +324,7 @@ with st.expander("⚙️ TTS SETTINGS & CONTROLS (Multi-Language Auto Support)",
     with col_opt_pitch:
         pitch_custom = st.select_slider("🎚️ Voice Pitch:", options=["Normal", "Deep Base", "Heavy Base"], value="Normal", key="main_tts_pitch")
     with col_opt_pause:
-        pause_duration = st.slider("⏸️ Pause (Sec):", min_value=0.3, max_value=2.0, value=0.5, step=0.1, key="main_tts_pause")
+        pause_duration = st.slider("⏸️ Line Pause (Sec):", min_value=0.2, max_value=1.5, value=0.4, step=0.1, key="main_tts_pause")
         
     col_bgm_1, col_bgm_2 = st.columns([0.4, 0.6])
     with col_bgm_1:
@@ -382,7 +334,7 @@ with st.expander("⚙️ TTS SETTINGS & CONTROLS (Multi-Language Auto Support)",
 
 
 # ==========================================
-# 7. ACTION CONTROLS
+# 6. ACTION CONTROLS
 # ==========================================
 active_text = st.session_state.main_text.strip()
 b1, b2, b3 = st.columns(3)
@@ -392,21 +344,21 @@ with b1:
     convert_btn = st.button("🔊 TTS", type="primary", use_container_width=True)
 with b2:
     if active_text:
-        html_trans_page = f"<!DOCTYPE html><html><head><meta charset='utf-8'></head><body><p style='font-size:18px; line-height:1.6;'>{active_text.replace(chr(10), '<br>')}</p></body></html>"
-        st.download_button("🌐 HTML", data=html_trans_page.encode('utf-8'), file_name="translate.html", mime="text/html", use_container_width=True)
+        html_trans_page = f"<!DOCTYPE html><html><head><meta charset='utf-8'></head><body><p style='font-size:18px; line-height:1.8;'>{active_text.replace(chr(10), '<br>')}</p></body></html>"
+        st.download_button("🌐 HTML", data=html_trans_page.encode('utf-8'), file_name="speech_script.html", mime="text/html", use_container_width=True)
     else:
         st.button("🌐 HTML", disabled=True, use_container_width=True)
 with b3:
     if active_text:
         printable_pdf = create_printable_pdf_html(active_text)
-        st.download_button("📄 PDF", data=printable_pdf.encode('utf-8'), file_name="note.html", mime="text/html", use_container_width=True)
+        st.download_button("📄 PDF", data=printable_pdf.encode('utf-8'), file_name="speech_script.html", mime="text/html", use_container_width=True)
     else:
         st.button("📄 PDF", disabled=True, use_container_width=True)
 
 with b4:
     if active_text:
         docx_data = create_docx_bytes(active_text)
-        st.download_button("📝 DOCX", data=docx_data, file_name="note.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+        st.download_button("📝 DOCX", data=docx_data, file_name="speech_script.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
     else:
         st.button("📝 DOCX", disabled=True, use_container_width=True)
 with b5:
@@ -427,7 +379,7 @@ with b6:
 
 
 # ==========================================
-# 8. ఆటో మల్టీ-లాంగ్వేజ్ TTS జనరేషన్ ఇంజిన్
+# 7. ఆటో మల్టీ-లాంగ్వేజ్ TTS జనరేషన్ ఇంజిన్
 # ==========================================
 if convert_btn:
     if active_text:
@@ -445,7 +397,7 @@ if convert_btn:
                     "en": "en-IN-PrabhatNeural" if "Male" in gender_choice else "en-IN-NeerjaNeural"
                 }
 
-                text_chunks = split_text_into_chunks(clean_txt, max_chars=250)
+                text_chunks = split_text_into_chunks(clean_txt, max_chars=200)
                 speech_sound = AudioSegment.empty()
                 silence_pause = AudioSegment.silent(duration=int(pause_duration * 1000))
 
@@ -508,7 +460,7 @@ if st.session_state.audio_bytes_data is not None:
     st.download_button(
         label="📥 DOWNLOAD MP3", 
         data=st.session_state.audio_bytes_data, 
-        file_name="audio.mp3", 
+        file_name="speech_audio.mp3", 
         mime="audio/mp3",
         key="download_btn",
         use_container_width=True
