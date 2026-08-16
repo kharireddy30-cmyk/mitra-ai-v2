@@ -10,3 +10,4 @@ edge-tts
 python-docx
 pypdf
 deep-translator
+SpeechRecognition
