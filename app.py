@@ -14,7 +14,7 @@ import docx
 from streamlit_mic_recorder import speech_to_text
 
 # ==========================================
-# 1. పేజీ సెట్టింగ్స్ & మొబైల్ స్టైల్స్
+# 1. పేజీ సెట్టింగ్స్ & UI స్టైల్స్
 # ==========================================
 st.set_page_config(
     page_title="BRAHMA AI", 
@@ -58,7 +58,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Android & Laptop DSP Active.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Multi-language STT Active.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -67,7 +67,7 @@ def add_log(msg, color="#38bdf8"):
 
 
 # ==========================================
-# 2. మొబైల్ & డెస్క్‌టాప్ ఆప్టిమైజ్డ్ DSP & STT ఇంజిన్
+# 2. కోర్ DSP & మల్టీ-లాంగ్వేజ్ STT ఇంజిన్
 # ==========================================
 
 def apply_audio_dsp(audio_segment: AudioSegment) -> AudioSegment:
@@ -82,8 +82,6 @@ def apply_audio_dsp(audio_segment: AudioSegment) -> AudioSegment:
 
 def transcribe_audio_file(uploaded_audio_file, lang_code="te-IN", enable_dsp=True):
     uploaded_audio_file.seek(0)
-    
-    # మొబైల్ ఫైల్ అసలైన ఎక్స్‌టెన్షన్‌ను సంగ్రహించడం (.m4a, .aac, .mp3, etc.)
     file_ext = os.path.splitext(uploaded_audio_file.name)[1].lower()
     if not file_ext:
         file_ext = ".m4a"
@@ -95,9 +93,7 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="te-IN", enable_dsp=Tru
         f.write(uploaded_audio_file.read())
 
     try:
-        # ఆడియోను రీడ్ చేసి 16kHz మోనో WAV లోకి కన్వర్ట్ చేయడం
         sound = AudioSegment.from_file(temp_in)
-        
         if enable_dsp:
             sound = apply_audio_dsp(sound)
         
@@ -111,9 +107,9 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="te-IN", enable_dsp=Tru
             text_result = recognizer.recognize_google(audio_data, language=lang_code)
             return text_result
     except sr.UnknownValueError:
-        return "⚠️ Voice not recognized. Please speak clearly."
+        return "⚠️ Voice not recognized. Check language or clarity."
     except Exception as e:
-        return f"⚠️ Mobile Audio Error: {e}"
+        return f"⚠️ STT Error: {e}"
     finally:
         for p in [temp_in, temp_wav]:
             if os.path.exists(p):
@@ -200,17 +196,29 @@ with c_file:
             add_log(f"DOC Error: {fe}", "#f87171")
             st.error(f"Error: {fe}")
 
-# 2. AUDIO STT (మొబైల్ ఫైల్స్ సపోర్ట్)
+# 2. AUDIO STT (మల్టీ-లాంగ్వేజ్ సపోర్ట్)
 with c_audio_stt:
     st.markdown("**🎵 AUDIO STT**")
+    
+    # ఆడియో ఫైల్ లాంగ్వేజ్ సెలెక్టర్
+    stt_lang_choice = st.selectbox(
+        "Audio Language:", 
+        options=["TE (తెలుగు)", "HI (हिंदी)", "EN (English)"], 
+        key="stt_lang_choice"
+    )
+    stt_lang_map = {"TE (తెలుగు)": "te-IN", "HI (हिंदी)": "hi-IN", "EN (English)": "en-IN"}
+    selected_stt_lang = stt_lang_map[stt_lang_choice]
+
     uploaded_audio = st.file_uploader("Upload Audio", type=["mp3", "wav", "m4a", "ogg", "aac", "opus", "3gp"], key="audio_stt_file_uploader", label_visibility="collapsed")
-    use_dsp = st.checkbox("✨ DSP Booster", value=True)
     
     if uploaded_audio is not None:
+        st.audio(uploaded_audio, format=f"audio/{os.path.splitext(uploaded_audio.name)[1].replace('.', '')}")
+        use_dsp = st.checkbox("✨ DSP Booster", value=True, key="stt_dsp_chk")
+        
         if st.button("🚀 RUN STT", use_container_width=True):
-            add_log(f"STT Started: {uploaded_audio.name}", "#c084fc")
-            with st.spinner("Processing Audio..."):
-                transcribed_txt = transcribe_audio_file(uploaded_audio, lang_code="te-IN", enable_dsp=use_dsp)
+            add_log(f"STT Started: {uploaded_audio.name} ({stt_lang_choice})", "#c084fc")
+            with st.spinner(f"Converting {stt_lang_choice} Audio to Text..."):
+                transcribed_txt = transcribe_audio_file(uploaded_audio, lang_code=selected_stt_lang, enable_dsp=use_dsp)
                 if transcribed_txt and not transcribed_txt.startswith("⚠️"):
                     st.session_state.main_text = (st.session_state.main_text + " " + transcribed_txt).strip()
                     add_log(f"STT Success ({len(transcribed_txt)} chars)", "#4ade80")
@@ -223,7 +231,7 @@ with c_audio_stt:
 # 3. LIVE MIC
 with c_mic:
     st.markdown("**🎙️ LIVE MIC**")
-    mic_lang = st.selectbox("Lang:", options=["TE (తెలుగు)", "HI (हिंदी)", "EN (English)"], label_visibility="collapsed")
+    mic_lang = st.selectbox("Mic Lang:", options=["TE (తెలుగు)", "HI (हिंदी)", "EN (English)"], label_visibility="collapsed")
     mic_code_map = {"TE (తెలుగు)": "te-IN", "HI (हिंदी)": "hi-IN", "EN (English)": "en-IN"}
     
     spoken_result = speech_to_text(
@@ -327,7 +335,7 @@ with b6:
 with st.expander("⚙️ SETTINGS (Voice, Speed, Pitch & BGM)", expanded=False):
     col_lang, col_voice = st.columns(2)
     with col_lang:
-        selected_lang = st.selectbox("Language:", options=["Telugu", "Hindi", "English"])
+        selected_lang = st.selectbox("TTS Language:", options=["Telugu", "Hindi", "English"])
 
     with col_voice:
         if "Telugu" in selected_lang:
