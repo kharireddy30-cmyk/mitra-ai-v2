@@ -33,7 +33,7 @@ st.markdown("""
         padding: 10px;
         font-family: 'Courier New', Courier, monospace;
         font-size: 12px;
-        height: 130px;
+        height: 120px;
         overflow-y: auto;
         border: 1px solid #334155;
     }
@@ -58,7 +58,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Multi-language STT Active.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. DSP & Smart Chunking Active.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -67,7 +67,7 @@ def add_log(msg, color="#38bdf8"):
 
 
 # ==========================================
-# 2. కోర్ DSP & మల్టీ-లాంగ్వేజ్ STT ఇంజిన్
+# 2. కోర్ DSP & స్మార్ట్ చంకింగ్ ఇంజిన్
 # ==========================================
 
 def apply_audio_dsp(audio_segment: AudioSegment) -> AudioSegment:
@@ -107,7 +107,7 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="te-IN", enable_dsp=Tru
             text_result = recognizer.recognize_google(audio_data, language=lang_code)
             return text_result
     except sr.UnknownValueError:
-        return "⚠️ Voice not recognized. Check language or clarity."
+        return "⚠️ Voice not recognized. Check audio language."
     except Exception as e:
         return f"⚠️ STT Error: {e}"
     finally:
@@ -122,20 +122,34 @@ async def generate_voice_file(text, voice, pitch_val, rate_val, output_filename)
     communicate = edge_tts.Communicate(text, voice, pitch=pitch_val, rate=rate_val)
     await communicate.save(output_filename)
 
-def split_text_into_chunks(text, max_chars=300):
+# పంక్చుయేషన్ లేకపోయినా సురక్షితంగా విడగొట్టే స్మార్ట్ చంకింగ్
+def split_text_into_chunks(text, max_chars=250):
     clean_text = re.sub(r'\s+', ' ', text).strip()
-    sentences = re.split(r'(?<=[.!?\n।])\s+', clean_text)
+    if not clean_text:
+        return []
+    
+    # ముందుగా వాక్యాలుగా విడగొట్టడం
+    raw_sentences = re.split(r'(?<=[.!?\n।])\s+', clean_text)
     chunks = []
-    current_chunk = ""
-    for sentence in sentences:
-        if len(current_chunk) + len(sentence) <= max_chars:
-            current_chunk += sentence + " "
+    
+    for sentence in raw_sentences:
+        if len(sentence) <= max_chars:
+            if sentence.strip():
+                chunks.append(sentence.strip())
         else:
-            if current_chunk.strip():
-                chunks.append(current_chunk.strip())
-            current_chunk = sentence + " "
-    if current_chunk.strip():
-        chunks.append(current_chunk.strip())
+            # ఫుల్‌స్టాప్‌లు లేని సుదీర్ఘ వాక్యాల కోసం పదాల ఆధారంగా విభజన
+            words = sentence.split(' ')
+            curr_chunk = ""
+            for word in words:
+                if len(curr_chunk) + len(word) + 1 <= max_chars:
+                    curr_chunk += word + " "
+                else:
+                    if curr_chunk.strip():
+                        chunks.append(curr_chunk.strip())
+                    curr_chunk = word + " "
+            if curr_chunk.strip():
+                chunks.append(curr_chunk.strip())
+                
     return [c.strip() for c in chunks if len(c.strip()) > 0]
 
 def extract_text_from_file(uploaded_file):
@@ -196,28 +210,22 @@ with c_file:
             add_log(f"DOC Error: {fe}", "#f87171")
             st.error(f"Error: {fe}")
 
-# 2. AUDIO STT (మల్టీ-లాంగ్వేజ్ సపోర్ట్)
+# 2. AUDIO STT
 with c_audio_stt:
     st.markdown("**🎵 AUDIO STT**")
-    
-    # ఆడియో ఫైల్ లాంగ్వేజ్ సెలెక్టర్
-    stt_lang_choice = st.selectbox(
-        "Audio Language:", 
-        options=["TE (తెలుగు)", "HI (हिंदी)", "EN (English)"], 
-        key="stt_lang_choice"
-    )
+    stt_lang_choice = st.selectbox("Audio Lang:", options=["HI (हिंदी)", "TE (తెలుగు)", "EN (English)"], key="stt_lang_choice", label_visibility="collapsed")
     stt_lang_map = {"TE (తెలుగు)": "te-IN", "HI (हिंदी)": "hi-IN", "EN (English)": "en-IN"}
     selected_stt_lang = stt_lang_map[stt_lang_choice]
 
     uploaded_audio = st.file_uploader("Upload Audio", type=["mp3", "wav", "m4a", "ogg", "aac", "opus", "3gp"], key="audio_stt_file_uploader", label_visibility="collapsed")
     
     if uploaded_audio is not None:
-        st.audio(uploaded_audio, format=f"audio/{os.path.splitext(uploaded_audio.name)[1].replace('.', '')}")
+        st.audio(uploaded_audio)
         use_dsp = st.checkbox("✨ DSP Booster", value=True, key="stt_dsp_chk")
         
         if st.button("🚀 RUN STT", use_container_width=True):
             add_log(f"STT Started: {uploaded_audio.name} ({stt_lang_choice})", "#c084fc")
-            with st.spinner(f"Converting {stt_lang_choice} Audio to Text..."):
+            with st.spinner(f"Converting {stt_lang_choice} Audio..."):
                 transcribed_txt = transcribe_audio_file(uploaded_audio, lang_code=selected_stt_lang, enable_dsp=use_dsp)
                 if transcribed_txt and not transcribed_txt.startswith("⚠️"):
                     st.session_state.main_text = (st.session_state.main_text + " " + transcribed_txt).strip()
@@ -249,31 +257,50 @@ with c_mic:
         st.rerun()
 
 # ==========================================
-# 4. DIAGNOSTICS CONSOLE
+# 4. MAIN TEXT EDITOR
 # ==========================================
-with st.expander("🔍 DIAGNOSTICS", expanded=False):
-    log_html = "<div class='diag-box'>"
-    for item in st.session_state.diag_logs[-15:]:
-        log_html += f"<div class='diag-log'><span class='log-time'>[{item['time']}]</span> <span style='color:{item['color']};'>{item['msg']}</span></div>"
-    log_html += "</div>"
-    st.markdown(log_html, unsafe_allow_html=True)
-    if st.button("🗑️ CLEAR LOGS", use_container_width=True):
-        st.session_state.diag_logs = [{"time": datetime.now().strftime("%H:%M:%S"), "msg": "Logs cleared.", "color": "#38bdf8"}]
-        st.rerun()
-
-# ==========================================
-# 5. MAIN TEXT EDITOR
-# ==========================================
+st.divider()
 user_input_text = st.text_area(
     "Content Editor", 
     value=st.session_state.main_text, 
     height=160,
-    placeholder="Text content here...",
+    placeholder="Text content appears here...",
     label_visibility="collapsed"
 )
 
 if user_input_text != st.session_state.main_text:
     st.session_state.main_text = user_input_text
+
+
+# ==========================================
+# 5. టెక్స్ట్ బాక్స్ కిందే TTS SETTINGS & CONTROLS
+# ==========================================
+st.markdown("##### ⚙️ TTS SETTINGS & CONTROLS")
+col_tts_lang, col_tts_voice, col_tts_speed = st.columns([0.34, 0.36, 0.30])
+
+with col_tts_lang:
+    tts_lang = st.selectbox("🌐 TTS Lang:", options=["Telugu (తెలుగు)", "Hindi (हिंदी)", "English"], key="main_tts_lang_select")
+
+with col_tts_voice:
+    if "Telugu" in tts_lang:
+        voice_option = st.radio("Voice:", options=["👨 Mohan", "👩 Shruti"], horizontal=True, key="v_te")
+    elif "Hindi" in tts_lang:
+        voice_option = st.radio("Voice:", options=["👨 Madhur", "👩 Swara"], horizontal=True, key="v_hi")
+    else:
+        voice_option = st.radio("Voice:", options=["👨 Prabhat", "👩 Neerja"], horizontal=True, key="v_en")
+
+with col_tts_speed:
+    audio_speed = st.select_slider("Speed:", options=[0.75, 0.85, 1.0, 1.15, 1.25], value=0.85, key="main_tts_speed")
+
+# ఆప్షనల్ BGM & Pitch
+with st.expander("🎛️ Pitch & BGM Fine-Tuning", expanded=False):
+    col_p, col_b1, col_b2 = st.columns([0.33, 0.33, 0.34])
+    with col_p:
+        pitch_custom = st.select_slider("Pitch:", options=["Normal", "Deep Base", "Heavy Base"], value="Normal")
+    with col_b1:
+        enable_bgm = st.checkbox("🎶 Enable BGM", value=True)
+    with col_b2:
+        bgm_volume = st.slider("BGM Vol (%):", min_value=2, max_value=20, value=6)
 
 
 # ==========================================
@@ -330,43 +357,12 @@ with b6:
 
 
 # ==========================================
-# 7. VOICE & AUDIO SETTINGS
-# ==========================================
-with st.expander("⚙️ SETTINGS (Voice, Speed, Pitch & BGM)", expanded=False):
-    col_lang, col_voice = st.columns(2)
-    with col_lang:
-        selected_lang = st.selectbox("TTS Language:", options=["Telugu", "Hindi", "English"])
-
-    with col_voice:
-        if "Telugu" in selected_lang:
-            voice_option = st.radio("Voice:", options=["👨 Mohan", "👩 Shruti"], horizontal=True)
-        elif "Hindi" in selected_lang:
-            voice_option = st.radio("Voice:", options=["👨 Madhur", "👩 Swara"], horizontal=True)
-        else:
-            voice_option = st.radio("Voice:", options=["👨 Prabhat", "👩 Neerja"], horizontal=True)
-
-    col_opt_speed, col_opt_pitch, col_opt_pause = st.columns(3)
-    with col_opt_speed:
-        audio_speed = st.select_slider("Speed:", options=[0.75, 0.85, 1.0, 1.15, 1.25, 1.5], value=0.85)
-    with col_opt_pitch:
-        pitch_custom = st.select_slider("Pitch:", options=["Normal", "Deep Base", "Heavy Base"], value="Normal")
-    with col_opt_pause:
-        pause_duration = st.slider("Pause (Sec):", min_value=0.3, max_value=2.0, value=0.6, step=0.1)
-        
-    col_bgm_1, col_bgm_2 = st.columns([0.4, 0.6])
-    with col_bgm_1:
-        enable_bgm = st.checkbox("🎶 Enable BGM", value=True)
-    with col_bgm_2:
-        bgm_volume = st.slider("BGM Vol (%):", min_value=2, max_value=20, value=6)
-
-
-# ==========================================
-# 8. TTS ENGINE
+# 7. TTS EXECUTION ENGINE
 # ==========================================
 if convert_btn:
     if active_text:
-        add_log("TTS Processing...", "#c084fc")
-        with st.spinner("Generating Voice..."):
+        add_log(f"TTS Started: {tts_lang} ({voice_option})", "#c084fc")
+        with st.spinner("Generating Audio..."):
             try:
                 clean_txt = re.sub(r'[*#_~`]', '', active_text)
                 
@@ -388,20 +384,21 @@ if convert_btn:
                 }
                 pitch_str = pitch_val_map[pitch_custom]
 
-                text_chunks = split_text_into_chunks(clean_txt, max_chars=300)
+                # స్మార్ట్ చంకింగ్ ద్వారా టెక్స్ట్ విభజన
+                text_chunks = split_text_into_chunks(clean_txt, max_chars=250)
                 speech_sound = AudioSegment.empty()
-                silence_pause = AudioSegment.silent(duration=int(pause_duration * 1000))
+                silence_pause = AudioSegment.silent(duration=500)
 
                 for i, chunk in enumerate(text_chunks):
-                    temp_file = f"temp_{i}.mp3"
+                    temp_file = f"temp_tts_{i}.mp3"
                     try:
                         asyncio.run(generate_voice_file(chunk, selected_voice, pitch_str, rate_str, temp_file))
                         if os.path.exists(temp_file) and os.path.getsize(temp_file) > 0:
                             chunk_sound = AudioSegment.from_file(temp_file)
                             speech_sound += chunk_sound + silence_pause
                             os.remove(temp_file)
-                    except Exception:
-                        pass
+                    except Exception as chunk_err:
+                        add_log(f"Chunk {i} warning: {chunk_err}", "#facc15")
 
                 if len(speech_sound) > 0:
                     final_sound = speech_sound
@@ -421,12 +418,12 @@ if convert_btn:
                     final_fp = io.BytesIO()
                     final_sound.export(final_fp, format="mp3")
                     st.session_state.audio_bytes_data = final_fp.getvalue()
-                    add_log("TTS Complete!", "#4ade80")
+                    add_log("TTS Audio Ready!", "#4ade80")
                     gc.collect()
                     st.toast("🎉 TTS Ready!")
                 else:
-                    add_log("TTS Failed.", "#f87171")
-                    st.error("❌ Audio Generation Failed")
+                    add_log("TTS Failed (Empty Sound)", "#f87171")
+                    st.error("❌ Audio Generation Failed. Check selected language voice.")
 
             except Exception as e:
                 add_log(f"TTS Error: {e}", "#f87171")
@@ -447,3 +444,16 @@ if st.session_state.audio_bytes_data is not None:
         key="permanent_download_btn",
         use_container_width=True
     )
+
+# ==========================================
+# 8. DIAGNOSTICS CONSOLE (క్రింద భాగంలో)
+# ==========================================
+with st.expander("🔍 DIAGNOSTICS", expanded=False):
+    log_html = "<div class='diag-box'>"
+    for item in st.session_state.diag_logs[-15:]:
+        log_html += f"<div class='diag-log'><span class='log-time'>[{item['time']}]</span> <span style='color:{item['color']};'>{item['msg']}</span></div>"
+    log_html += "</div>"
+    st.markdown(log_html, unsafe_allow_html=True)
+    if st.button("🗑️ CLEAR LOGS", use_container_width=True):
+        st.session_state.diag_logs = [{"time": datetime.now().strftime("%H:%M:%S"), "msg": "Logs cleared.", "color": "#38bdf8"}]
+        st.rerun()
