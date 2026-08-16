@@ -50,7 +50,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.subheader("🕉️ BRAHMA AI : Studio (AI Text Polish & TTS)")
+st.subheader("🕉️ BRAHMA AI : Studio (Auto Polish STT & TTS)")
 
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
@@ -61,7 +61,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Secrets Linked & Secure.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Auto AI Polish Enabled.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -70,25 +70,24 @@ def add_log(msg, color="#38bdf8"):
 
 
 # ==========================================
-# 2. AI టెక్స్ట్ బ్యూటిఫైయర్ (Secrets Integration)
+# 2. అధునాతన AI స్క్రిప్ట్ ఎడిటర్ & పాలిషర్
 # ==========================================
 
 def polish_text_with_groq(text):
-    """Streamlit Secrets లోని GROQ_API_KEY ద్వారా పంక్చుయేషన్ & పేరాగ్రాఫ్‌లను తీర్చిదిద్దడం"""
+    """STT ద్వారా వచ్చిన టెక్స్ట్‌లోని అక్షర దోషాలను సరిచేసి, అందమైన పంక్చుయేషన్ & పేరాగ్రాఫ్‌లుగా మార్చే AI ఇంజిన్"""
     groq_key = st.secrets.get("GROQ_API_KEY", "")
     
     if not groq_key:
-        add_log("Secrets లో GROQ_API_KEY కనుగొనబడలేదు. రూల్-బేస్డ్ ఇంజిన్ వాడుతోంది.", "#facc15")
         return fallback_rule_based_polish(text)
     
-    prompt = f"""You are a professional text beautifier and speech script editor for Telugu, Hindi, and English.
+    prompt = f"""You are a master Telugu, Hindi, and English linguistic editor and speech scriptwriter.
 Task:
-1. Add appropriate commas (,), full stops (.), question marks, and natural pauses to the text so that Text-to-Speech (TTS) voice sounds natural and human-like.
-2. Break long unstructured sentences into clean, meaningful paragraphs and lines.
-3. DO NOT change the original meaning or core words.
-4. Return ONLY the polished and beautifully formatted text without any extra explanation, markdown headers, or chat responses.
+1. Fix subtle speech-to-text spelling/grammar errors (e.g., 'రెండు చేద్దాం' -> 'రండి చేద్దాం', 'సర్వేజనా' -> 'సర్వేజనాః/సర్వేజనా', etc.).
+2. Add natural punctuation (commas, full stops, ellipsis '...') and paragraph line breaks so that Text-to-Speech (TTS) sounds like a professional human announcement/speech.
+3. Preserve the exact original core meaning, context, and language.
+4. Output ONLY the polished and formatted final script without any conversational filler, meta text, or markdown code blocks.
 
-Original Text:
+Raw Input Text:
 {text}
 """
     
@@ -100,7 +99,7 @@ Original Text:
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.3
+        "temperature": 0.2
     }
     
     try:
@@ -110,11 +109,10 @@ Original Text:
             polished = res_data['choices'][0]['message']['content'].strip()
             return polished
     except Exception as e:
-        add_log(f"Groq Polish లోపం: {e}", "#f87171")
+        add_log(f"Auto-Polish Note: {e}", "#facc15")
         return fallback_rule_based_polish(text)
 
 def fallback_rule_based_polish(text):
-    """ఆఫ్‌లైన్ బ్యాకప్ రూల్-బేస్డ్ ఇంజిన్"""
     clean_txt = re.sub(r'\s+', ' ', text).strip()
     connectors = ["అయితే", "మరియు", "కానీ", "కాబట్టి", "అందువల్ల", "ఎందుకంటే", "అలాగే", "మరోవైపు", "తో పాటు", "తర్వాత"]
     for c in connectors:
@@ -211,7 +209,10 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="auto", enable_dsp=True
                     pass
 
         if full_transcript:
-            return " ".join(full_transcript)
+            raw_text = " ".join(full_transcript)
+            # ఆడియో STT పూర్తికాగానే నేరుగా ఇక్కడే AI ద్వారా సరిచేయడం
+            polished_text = polish_text_with_groq(raw_text)
+            return polished_text
         else:
             return "⚠️ Voice not recognized. Try selecting a specific language."
 
@@ -309,12 +310,12 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             use_dsp = st.checkbox("✨ DSP Booster", value=True, key="stt_dsp_chk")
             if st.button("🚀 RUN STT", use_container_width=True):
                 add_log(f"STT Started: {uploaded_audio.name} ({stt_lang_choice})", "#c084fc")
-                with st.spinner("Transcribing Multi-Language Audio..."):
+                with st.spinner("Processing & AI Polishing Script... Please wait..."):
                     transcribed_txt = transcribe_audio_file(uploaded_audio, lang_code=selected_stt_lang, enable_dsp=use_dsp)
                     if transcribed_txt and not transcribed_txt.startswith("⚠️"):
-                        st.session_state.main_text = (st.session_state.main_text + " " + transcribed_txt).strip()
-                        add_log(f"STT Complete ({len(transcribed_txt)} chars)", "#4ade80")
-                        st.toast("✅ STT Complete!")
+                        st.session_state.main_text = transcribed_txt.strip()
+                        add_log(f"STT & Polish Complete ({len(transcribed_txt)} chars)", "#4ade80")
+                        st.toast("✅ ఆడియో టెక్స్ట్‌గా మారి అందంగా తీర్చబడింది!")
                         st.rerun()
                     else:
                         st.error(transcribed_txt)
@@ -331,31 +332,17 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             key='mic_rec'
         )
         if spoken_result and spoken_result != st.session_state.last_mic_text:
-            st.session_state.main_text = (st.session_state.main_text + " " + spoken_result).strip()
+            polished_live = polish_text_with_groq(spoken_result)
+            st.session_state.main_text = (st.session_state.main_text + "\n\n" + polished_live).strip()
             st.session_state.last_mic_text = spoken_result
-            add_log(f"MIC: '{spoken_result}'", "#4ade80")
+            add_log(f"MIC: '{spoken_result}' (Polished)", "#4ade80")
             st.rerun()
 
 
 # ==========================================
-# 5. MAIN TEXT CONTENT & AI POLISH BAR
+# 5. MAIN TEXT CONTENT
 # ==========================================
-col_hdr, col_polish = st.columns([0.65, 0.35])
-with col_hdr:
-    st.markdown("##### 📝 టెక్స్ట్ ఎడిటర్ (Text Script)")
-with col_polish:
-    if st.button("✨ సుందరీకరించు (AI Polish)", use_container_width=True, help="పంక్చుయేషన్, పేరాగ్రాఫ్‌లు మరియు సహజ విరామాలను సరిచేస్తుంది"):
-        if st.session_state.main_text.strip():
-            with st.spinner("AI ద్వారా టెక్స్ట్‌ని అందంగా తీర్చిదిద్దుతోంది..."):
-                polished = polish_text_with_groq(st.session_state.main_text)
-                if polished:
-                    st.session_state.main_text = polished
-                    add_log("టెక్స్ట్ విజయవంతంగా సుందరీకరించబడింది!", "#38bdf8")
-                    st.toast("✨ టెక్స్ట్ శ్రావ్యమైన ఆడియో కోసం సిద్ధమైంది!", icon="✨")
-                    st.rerun()
-        else:
-            st.warning("దయచేసి ముందుగా టెక్స్ట్‌ను ఎంటర్ చేయండి.")
-
+st.markdown("##### 📝 టెక్స్ట్ ఎడిటర్ (Formatted Speech Script)")
 user_input_text = st.text_area(
     "Content Editor", 
     value=st.session_state.main_text, 
