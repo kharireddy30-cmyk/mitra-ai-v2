@@ -14,7 +14,7 @@ import docx
 from streamlit_mic_recorder import speech_to_text
 
 # ==========================================
-# 1. పేజీ సెట్టింగ్స్ & కాంపాక్ట్ మొబైల్ UI
+# 1. పేజీ సెట్టింగ్స్ & కాంపాక్ట్ UI
 # ==========================================
 st.set_page_config(
     page_title="BRAHMA AI", 
@@ -27,7 +27,6 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Mandali&display=swap');
     * { font-family: 'Mandali', 'Segoe UI', Tahoma, sans-serif; }
-    
     .block-container { padding-top: 1rem; padding-bottom: 2rem; }
     div.stButton > button, div.stDownloadButton > button {
         font-weight: 600 !important;
@@ -48,7 +47,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.subheader("🕉️ BRAHMA AI : Studio")
+st.subheader("🕉️ BRAHMA AI : Studio (Auto Multi-Lingual)")
 
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
@@ -59,7 +58,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Complete TTS Engine & BGM Online.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Auto Multi-Language Engine Online.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -68,11 +67,24 @@ def add_log(msg, color="#38bdf8"):
 
 
 # ==========================================
-# 2. కోర్ DSP, STT & డాక్యుమెంట్ ఇంజిన్
+# 2. మల్టీ-లాంగ్వేజ్ డిటెక్షన్ & రూటింగ్ ఇంజిన్
 # ==========================================
 
+def detect_chunk_language(text):
+    """ఒక వాక్యంలో ఏ భాష ఎక్కువ ఉందో ఆటోమేటిక్‌గా గుర్తిస్తుంది"""
+    te_count = len(re.findall(r'[\u0C00-\u0C7F]', text))  # తెలుగు
+    hi_count = len(re.findall(r'[\u0900-\u097F]', text))  # హిందీ
+    en_count = len(re.findall(r'[a-zA-Z]', text))          # ఇంగ్లీష్
+
+    if te_count > hi_count and te_count > en_count:
+        return "te"
+    elif hi_count > te_count and hi_count > en_count:
+        return "hi"
+    elif en_count > 0:
+        return "en"
+    return "te"  # డీఫాల్ట్
+
 def apply_audio_dsp(audio_segment: AudioSegment) -> AudioSegment:
-    """ఆడియో క్వాలిటీని పెంచే DSP ఫిల్టర్లు"""
     try:
         processed = high_pass_filter(audio_segment, cutoff=300)
         processed = low_pass_filter(processed, cutoff=3800)
@@ -82,20 +94,21 @@ def apply_audio_dsp(audio_segment: AudioSegment) -> AudioSegment:
     except Exception:
         return audio_segment
 
-def transcribe_audio_file(uploaded_audio_file, lang_code="te-IN", enable_dsp=True):
-    """సుదీర్ఘమైన ఆడియోలను (5 నుండి 15+ నిమిషాలు) 50 సెకన్ల ముక్కలుగా విభజించి పూర్తి టెక్స్ట్‌గా మార్చే ఫంక్షన్"""
+def transcribe_audio_file(uploaded_audio_file, lang_code="auto", enable_dsp=True):
     uploaded_audio_file.seek(0)
     file_ext = os.path.splitext(uploaded_audio_file.name)[1].lower()
     if not file_ext:
         file_ext = ".m4a"
         
     temp_in = f"temp_stt_in{file_ext}"
-    
     with open(temp_in, "wb") as f:
         f.write(uploaded_audio_file.read())
 
     full_transcript = []
     recognizer = sr.Recognizer()
+
+    # మల్టీ-లాంగ్వేజ్ కోసం సీక్వెన్స్
+    target_langs = ["te-IN", "hi-IN", "en-IN"] if lang_code == "auto" else [lang_code]
 
     try:
         sound = AudioSegment.from_file(temp_in)
@@ -103,9 +116,7 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="te-IN", enable_dsp=Tru
             sound = apply_audio_dsp(sound)
         
         sound = sound.set_channels(1).set_frame_rate(16000)
-        
-        # 50 సెకన్ల చొప్పున ఆడియో విభజన
-        chunk_length_ms = 50 * 1000
+        chunk_length_ms = 45 * 1000  # 45 సెకన్లు
         total_len = len(sound)
         
         for i in range(0, total_len, chunk_length_ms):
@@ -113,27 +124,29 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="te-IN", enable_dsp=Tru
             temp_chunk_wav = f"temp_chunk_{i}.wav"
             chunk_audio.export(temp_chunk_wav, format="wav")
             
-            try:
-                with sr.AudioFile(temp_chunk_wav) as source:
-                    audio_data = recognizer.record(source)
-                    part_text = recognizer.recognize_google(audio_data, language=lang_code)
-                    if part_text and part_text.strip():
-                        full_transcript.append(part_text.strip())
-            except sr.UnknownValueError:
-                pass
-            except Exception:
-                pass
-            finally:
-                if os.path.exists(temp_chunk_wav):
-                    try:
-                        os.remove(temp_chunk_wav)
-                    except Exception:
-                        pass
+            part_recognized = False
+            for test_lang in target_langs:
+                try:
+                    with sr.AudioFile(temp_chunk_wav) as source:
+                        audio_data = recognizer.record(source)
+                        part_text = recognizer.recognize_google(audio_data, language=test_lang)
+                        if part_text and part_text.strip():
+                            full_transcript.append(part_text.strip())
+                            part_recognized = True
+                            break
+                except Exception:
+                    continue
+            
+            if os.path.exists(temp_chunk_wav):
+                try:
+                    os.remove(temp_chunk_wav)
+                except Exception:
+                    pass
 
         if full_transcript:
             return " ".join(full_transcript)
         else:
-            return "⚠️ Voice not recognized. Check audio language."
+            return "⚠️ Voice not recognized. Try selecting a specific language."
 
     except Exception as e:
         return f"⚠️ STT Error: {e}"
@@ -199,12 +212,11 @@ def create_printable_pdf_html(text):
 
 
 # ==========================================
-# 3. ఇన్‌పుట్ విభాగాలు (కాంప్యాక్ట్ గ్రిడ్)
+# 3. ఇన్‌పుట్ విభాగాలు (DOC | AUDIO | MIC)
 # ==========================================
 with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
     c_file, c_audio_stt, c_mic = st.columns([0.33, 0.34, 0.33])
 
-    # 1. DOC / TXT
     with c_file:
         st.markdown("**📁 DOC / TXT**")
         uploaded_file = st.file_uploader("Upload Doc", type=["docx", "txt"], key="doc_file_uploader", label_visibility="collapsed")
@@ -218,11 +230,10 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             except Exception as fe:
                 st.error(f"Error: {fe}")
 
-    # 2. AUDIO STT (మల్టీ-లాంగ్వేజ్ సపోర్ట్)
     with c_audio_stt:
-        st.markdown("**🎵 AUDIO STT (Full Audio)**")
-        stt_lang_choice = st.selectbox("Audio Lang:", options=["HI (हिंदी)", "TE (తెలుగు)", "EN (English)"], key="stt_lang_choice", label_visibility="collapsed")
-        stt_lang_map = {"TE (తెలుగు)": "te-IN", "HI (हिंदी)": "hi-IN", "EN (English)": "en-IN"}
+        st.markdown("**🎵 AUDIO STT (Multi-min)**")
+        stt_lang_choice = st.selectbox("Audio Lang:", options=["🔄 Auto (Multi-Lang)", "HI (हिंदी)", "TE (తెలుగు)", "EN (English)"], key="stt_lang_choice", label_visibility="collapsed")
+        stt_lang_map = {"🔄 Auto (Multi-Lang)": "auto", "TE (తెలుగు)": "te-IN", "HI (हिंदी)": "hi-IN", "EN (English)": "en-IN"}
         selected_stt_lang = stt_lang_map[stt_lang_choice]
 
         uploaded_audio = st.file_uploader("Upload Audio", type=["mp3", "wav", "m4a", "ogg", "aac", "opus", "3gp"], key="audio_stt_file_uploader", label_visibility="collapsed")
@@ -231,7 +242,7 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             use_dsp = st.checkbox("✨ DSP Booster", value=True, key="stt_dsp_chk")
             if st.button("🚀 RUN STT", use_container_width=True):
                 add_log(f"STT Started: {uploaded_audio.name} ({stt_lang_choice})", "#c084fc")
-                with st.spinner("Processing Full Audio... Please wait..."):
+                with st.spinner("Transcribing Multi-Language Audio..."):
                     transcribed_txt = transcribe_audio_file(uploaded_audio, lang_code=selected_stt_lang, enable_dsp=use_dsp)
                     if transcribed_txt and not transcribed_txt.startswith("⚠️"):
                         st.session_state.main_text = (st.session_state.main_text + " " + transcribed_txt).strip()
@@ -241,7 +252,6 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
                     else:
                         st.error(transcribed_txt)
 
-    # 3. LIVE MIC
     with c_mic:
         st.markdown("**🎙️ LIVE MIC**")
         mic_lang = st.selectbox("Mic Lang:", options=["TE (తెలుగు)", "HI (हिंदी)", "EN (English)"], label_visibility="collapsed")
@@ -274,38 +284,34 @@ if user_input_text != st.session_state.main_text:
 
 
 # ==========================================
-# 5. సంపూర్ణ TTS SETTINGS (Speed, Pitch, Pause, BGM)
+# 5. TTS SETTINGS (Auto Smart Route Support)
 # ==========================================
-with st.expander("⚙️ TTS SETTINGS & CONTROLS (Voice, Speed, Pitch & BGM)", expanded=True):
+with st.expander("⚙️ TTS SETTINGS & CONTROLS (Multi-Language Auto Support)", expanded=True):
     col_tts_lang, col_tts_voice = st.columns([0.45, 0.55])
     
     with col_tts_lang:
-        tts_lang = st.selectbox("🌐 TTS Language:", options=["Hindi (हिंदी)", "Telugu (తెలుగు)", "English"], key="main_tts_lang_select")
+        tts_lang = st.selectbox("🌐 TTS Mode:", options=["🔄 Auto Detect (Multi-Lang)", "Hindi (हिंदी)", "Telugu (తెలుగు)", "English"], key="main_tts_lang_select")
+    
     with col_tts_voice:
-        if "Telugu" in tts_lang:
-            voice_option = st.radio("Voice:", options=["👨 Mohan", "👩 Shruti"], horizontal=True, key="v_te")
-        elif "Hindi" in tts_lang:
-            voice_option = st.radio("Voice:", options=["👨 Madhur", "👩 Swara"], horizontal=True, key="v_hi")
-        else:
-            voice_option = st.radio("Voice:", options=["👨 Prabhat", "👩 Neerja"], horizontal=True, key="v_en")
+        gender_choice = st.radio("Voice Gender:", options=["👨 Male (పురుష)", "👩 Female (స్త్రీ)"], horizontal=True, key="gender_sel")
 
     col_opt_speed, col_opt_pitch, col_opt_pause = st.columns(3)
     with col_opt_speed:
         audio_speed = st.select_slider("🔊 Play Speed:", options=[0.75, 0.85, 1.0, 1.15, 1.25, 1.5], value=0.85, key="main_tts_speed")
     with col_opt_pitch:
-        pitch_custom = st.select_slider("🎚️ Voice Pitch/Base:", options=["Normal", "Deep Base", "Heavy Base"], value="Normal", key="main_tts_pitch")
+        pitch_custom = st.select_slider("🎚️ Voice Pitch:", options=["Normal", "Deep Base", "Heavy Base"], value="Normal", key="main_tts_pitch")
     with col_opt_pause:
         pause_duration = st.slider("⏸️ Pause (Sec):", min_value=0.3, max_value=2.0, value=0.5, step=0.1, key="main_tts_pause")
         
     col_bgm_1, col_bgm_2 = st.columns([0.4, 0.6])
     with col_bgm_1:
-        enable_bgm = st.checkbox("🎶 Enable BGM (బ్యాక్‌గ్రౌండ్ మ్యూజిక్)", value=True, key="main_tts_bgm_chk")
+        enable_bgm = st.checkbox("🎶 Enable BGM", value=True, key="main_tts_bgm_chk")
     with col_bgm_2:
         bgm_volume = st.slider("🎵 BGM Volume (%):", min_value=2, max_value=20, value=6, key="main_tts_bgm_vol")
 
 
 # ==========================================
-# 6. ACTION CONTROLS (ROW 1 & ROW 2)
+# 6. ACTION CONTROLS
 # ==========================================
 active_text = st.session_state.main_text.strip()
 b1, b2, b3 = st.columns(3)
@@ -350,41 +356,44 @@ with b6:
 
 
 # ==========================================
-# 7. సంపూర్ణ TTS జనరేషన్ & BGM మిక్సింగ్ ఇంజిన్
+# 7. ఆటో మల్టీ-లాంగ్వేజ్ TTS జనరేషన్ ఇంజిన్
 # ==========================================
 if convert_btn:
     if active_text:
-        add_log(f"TTS Started: {tts_lang} ({voice_option})", "#c084fc")
-        with st.spinner("Generating Voice & Processing Audio..."):
+        add_log(f"TTS Started: Mode={tts_lang}", "#c084fc")
+        with st.spinner("Generating Multi-Language Voice..."):
             try:
                 clean_txt = re.sub(r'[*#_~`]', '', active_text)
-                
-                voice_map = {
-                    "👨 Mohan": "te-IN-MohanNeural",
-                    "👩 Shruti": "te-IN-ShrutiNeural",
-                    "👨 Madhur": "hi-IN-MadhurNeural",
-                    "👩 Swara": "hi-IN-SwaraNeural",
-                    "👨 Prabhat": "en-IN-PrabhatNeural",
-                    "👩 Neerja": "en-IN-NeerjaNeural"
-                }
-                selected_voice = voice_map[voice_option]
-
                 rate_str = f"{int((audio_speed - 1.0) * 100):+d}%"
-                pitch_val_map = {
-                    "Normal": "+0Hz",
-                    "Deep Base": "-5Hz",
-                    "Heavy Base": "-10Hz"
-                }
+                pitch_val_map = {"Normal": "+0Hz", "Deep Base": "-5Hz", "Heavy Base": "-10Hz"}
                 pitch_str = pitch_val_map[pitch_custom]
+
+                # వాయిస్ మ్యాపింగ్
+                voice_dict = {
+                    "te": "te-IN-MohanNeural" if "Male" in gender_choice else "te-IN-ShrutiNeural",
+                    "hi": "hi-IN-MadhurNeural" if "Male" in gender_choice else "hi-IN-SwaraNeural",
+                    "en": "en-IN-PrabhatNeural" if "Male" in gender_choice else "en-IN-NeerjaNeural"
+                }
 
                 text_chunks = split_text_into_chunks(clean_txt, max_chars=250)
                 speech_sound = AudioSegment.empty()
                 silence_pause = AudioSegment.silent(duration=int(pause_duration * 1000))
 
                 for i, chunk in enumerate(text_chunks):
+                    # ఆటో డిటెక్షన్ లేదా మాన్యువల్ సెలెక్షన్
+                    if "Auto" in tts_lang:
+                        detected_l = detect_chunk_language(chunk)
+                        chosen_voice = voice_dict[detected_l]
+                    elif "Telugu" in tts_lang:
+                        chosen_voice = voice_dict["te"]
+                    elif "Hindi" in tts_lang:
+                        chosen_voice = voice_dict["hi"]
+                    else:
+                        chosen_voice = voice_dict["en"]
+
                     temp_file = f"temp_tts_{i}.mp3"
                     try:
-                        asyncio.run(generate_voice_file(chunk, selected_voice, pitch_str, rate_str, temp_file))
+                        asyncio.run(generate_voice_file(chunk, chosen_voice, pitch_str, rate_str, temp_file))
                         if os.path.exists(temp_file) and os.path.getsize(temp_file) > 0:
                             chunk_sound = AudioSegment.from_file(temp_file)
                             speech_sound += chunk_sound + silence_pause
@@ -394,20 +403,17 @@ if convert_btn:
 
                 if len(speech_sound) > 0:
                     final_sound = speech_sound
-                    
-                    # BGM మిక్సింగ్ లాజిక్
                     if enable_bgm and os.path.exists("bgm.mp3"):
                         try:
                             bgm_sound = AudioSegment.from_file("bgm.mp3")
                             if len(bgm_sound) < len(speech_sound):
                                 bgm_sound = bgm_sound * ((len(speech_sound) // len(bgm_sound)) + 1)
-                            
                             bgm_sound = bgm_sound[:len(speech_sound) + 1000]
                             reduction_db = 22 - (bgm_volume * 1.5)
                             bgm_sound = bgm_sound - reduction_db
                             final_sound = speech_sound.overlay(bgm_sound)
-                        except Exception as be:
-                            add_log(f"BGM note: {be}", "#facc15")
+                        except Exception:
+                            pass
 
                     final_fp = io.BytesIO()
                     final_sound.export(final_fp, format="mp3")
@@ -416,7 +422,7 @@ if convert_btn:
                     gc.collect()
                     st.toast("🎉 TTS Audio Ready!")
                 else:
-                    add_log("TTS Failed (Empty Sound)", "#f87171")
+                    add_log("TTS Failed", "#f87171")
                     st.error("❌ Audio Generation Failed.")
 
             except Exception as e:
