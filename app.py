@@ -5,10 +5,11 @@ import re
 import os
 import gc
 import traceback
+from datetime import datetime
 from pydub import AudioSegment
 from streamlit_mic_recorder import speech_to_text
 
-# మన కస్టమ్ మొడ్యూల్స్ నుండి ఇంపోర్ట్
+# మన మొడ్యులర్ హెల్పర్ ఇంజిన్స్
 from document_utils import (
     extract_text_from_file,
     create_docx_bytes,
@@ -21,7 +22,7 @@ from audio_engine import (
 )
 
 # ==========================================
-# 1. పేజీ సెట్టింగ్స్ & CSS లోడ్ చేయడం
+# 1. పేజీ సెట్టింగ్స్ & సెషన్ స్టేట్స్
 # ==========================================
 st.set_page_config(
     page_title="ఆధ్యాత్మిక వాయిస్ యంత్రం", 
@@ -29,13 +30,34 @@ st.set_page_config(
     page_icon="🕉️"
 )
 
-# కస్టమ్ CSS ఇంజెక్ట్ చేయడం
-if os.path.exists("static/css/style.css"):
-    with open("static/css/style.css", "r", encoding="utf-8") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+# కస్టమ్ CSS
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Mandali&display=swap');
+    * { font-family: 'Mandali', sans-serif; }
+    .diag-box {
+        background-color: #0f172a;
+        color: #38bdf8;
+        border-radius: 10px;
+        padding: 12px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        height: 160px;
+        overflow-y: auto;
+        border: 1px solid #334155;
+    }
+    .diag-log { margin-bottom: 4px; line-height: 1.4; border-bottom: 1px solid #1e293b; padding-bottom: 2px; }
+    .log-time { color: #94a3b8; font-size: 11px; margin-right: 6px; }
+    .log-info { color: #facc15; }
+    .log-success { color: #4ade80; }
+    .log-err { color: #f87171; }
+    .log-action { color: #c084fc; }
+    .log-dsp { color: #34d399; }
+</style>
+""", unsafe_allow_html=True)
 
 st.header("🔱 ఆధ్యాత్మిక వాయిస్ సిస్టమ్")
-st.caption("వాయిస్ కన్వర్షన్ (TTS), ఆడియో టు టెక్స్ట్ (STT), Web Audio DSP & డాక్యుమెంట్ ఎక్స్‌పోర్ట్")
+st.caption("వాయిస్ కన్వర్షన్ (TTS), ఆడియో టు టెక్స్ట్ (STT), Web Audio DSP & లైవ్ డయాగ్నొస్టిక్స్ మానిటర్")
 
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
@@ -44,12 +66,20 @@ if "audio_bytes_data" not in st.session_state:
     st.session_state.audio_bytes_data = None
 if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
+if "diag_logs" not in st.session_state:
+    st.session_state.diag_logs = [
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "సిస్టమ్ సిద్ధంగా ఉంది. DSP ఆడియో ఫిల్టర్లు & డయాగ్నొస్టిక్స్ ఆన్ చేయబడ్డాయి.", "type": "log-info"}
+    ]
 
-# API Token (Streamlit Secrets నుండి)
+def add_log(msg, log_type="log-info"):
+    t_str = datetime.now().strftime("%H:%M:%S")
+    st.session_state.diag_logs.append({"time": t_str, "msg": msg, "type": log_type})
+
+# API Token
 HF_TOKEN = st.secrets.get("HF_TOKEN", None)
 
 # ==========================================
-# 2. ఇన్‌పుట్ విభాగం (డాక్స్, ఆడియో STT, & లైవ్ మైక్)
+# 2. ఇన్‌పుట్ విభాగం (3 కాలమ్స్: డాక్స్, ఆడియో STT, మైక్రోఫోన్)
 # ==========================================
 st.divider()
 c_doc, c_audio_stt, c_mic = st.columns([0.34, 0.33, 0.33])
@@ -58,10 +88,10 @@ c_doc, c_audio_stt, c_mic = st.columns([0.34, 0.33, 0.33])
 with c_doc:
     st.markdown("**📁 టెక్స్ట్ ఫైల్ (.docx, .txt):**")
     uploaded_doc = st.file_uploader(
-        "డాక్యుమెంట్ అప్‌లోడ్", 
+        "డాక్యుమెంట్ ఎంచుకోండి", 
         type=["docx", "txt"],
         key="doc_uploader",
-        help="Microsoft Word లేదా Text ఫైల్స్"
+        help="Microsoft Word (.docx) లేదా Text (.txt) ఫైల్స్"
     )
     if uploaded_doc is not None:
         if uploaded_doc.size <= 10 * 1024 * 1024:
@@ -69,23 +99,26 @@ with c_doc:
                 f_text = extract_text_from_file(uploaded_doc)
                 if f_text and f_text != st.session_state.main_text:
                     st.session_state.main_text = f_text
+                    add_log(f"డాక్యుమెంట్ లోడ్ అయింది: {uploaded_doc.name}", "log-success")
                     st.success(f"✅ '{uploaded_doc.name}' లోడ్ అయింది!")
             except Exception as fe:
+                add_log(f"డాక్యుమెంట్ ఎర్రర్: {fe}", "log-err")
                 st.error(f"ఫైల్ ఎర్రర్: {fe}")
 
-# 2. ఆడియో ఫైల్ స్పీచ్ టు టెక్స్ట్ (STT + DSP)
+# 2. ఆడియో ఫైల్ స్పీచ్ టు టెక్స్ట్ (Audio STT)
 with c_audio_stt:
     st.markdown("**🎵 ఆడియో ఫైల్ టు టెక్స్ట్ (STT):**")
     uploaded_audio = st.file_uploader(
-        "ఆడియో అప్‌లోడ్ (.mp3, .wav, .m4a)", 
+        "ఆడియో ఫైల్ (.mp3, .wav, .m4a)", 
         type=["mp3", "wav", "m4a", "ogg"],
         key="audio_stt_uploader"
     )
-    use_dsp = st.checkbox("✨ DSP వాయిస్ బూస్టర్ (మృదువైన స్వరాల కోసం)", value=True)
+    use_dsp = st.checkbox("✨ DSP వాయిస్ బూస్టర్ (మృదువైన గొంతుల కోసం)", value=True)
     
     if uploaded_audio is not None:
         if st.button("🚀 ఆడియోని టెక్స్ట్‌గా మార్చు", use_container_width=True):
-            with st.spinner("DSP తో ఆడియోను ప్రాసెస్ చేసి టెక్స్ట్‌గా మారుస్తోంది..."):
+            add_log(f"ఆడియో ప్రాసెసింగ్ ప్రారంభం: {uploaded_audio.name} (DSP: {'ఆన్' if use_dsp else 'ఆఫ్'})", "log-action")
+            with st.spinner("ఆడియోను టెక్స్ట్‌గా మారుస్తోంది..."):
                 transcribed_txt = transcribe_audio_file(
                     uploaded_audio, 
                     lang_code="te-IN", 
@@ -94,9 +127,11 @@ with c_audio_stt:
                 )
                 if transcribed_txt and not transcribed_txt.startswith("⚠️"):
                     st.session_state.main_text = (st.session_state.main_text + " " + transcribed_txt).strip()
+                    add_log(f"ఆడియో టెక్స్ట్‌గా మారింది! ({len(transcribed_txt)} అక్షరాలు)", "log-success")
                     st.success("✅ ఆడియో విజయవంతంగా టెక్స్ట్‌గా మార్చబడింది!")
                     st.rerun()
                 else:
+                    add_log(f"STT లోపం: {transcribed_txt}", "log-err")
                     st.error(transcribed_txt)
 
 # 3. లైవ్ మైక్రోఫోన్
@@ -115,6 +150,20 @@ with c_mic:
     if spoken_result and spoken_result != st.session_state.last_mic_text:
         st.session_state.main_text = (st.session_state.main_text + " " + spoken_result).strip()
         st.session_state.last_mic_text = spoken_result
+        add_log(f"లైవ్ మాట గ్రహించబడింది: '{spoken_result}'", "log-success")
+        st.rerun()
+
+# ==========================================
+# 3. డయాగ్నొస్టిక్స్ మానిటర్ కన్సోల్
+# ==========================================
+with st.expander("🔍 లైవ్ డయాగ్నొస్టిక్స్ & ఈవెంట్ మానిటర్ (Diagnostics Console)", expanded=True):
+    log_html = "<div class='diag-box'>"
+    for item in st.session_state.diag_logs[-15:]:
+        log_html += f"<div class='diag-log'><span class='log-time'>[{item['time']}]</span> <span class='{item['type']}'>{item['msg']}</span></div>"
+    log_html += "</div>"
+    st.markdown(log_html, unsafe_allow_html=True)
+    if st.button("🗑️ లాగ్స్ క్లియర్ చేయి"):
+        st.session_state.diag_logs = [{"time": datetime.now().strftime("%H:%M:%S"), "msg": "లాగ్స్ క్లియర్ చేయబడ్డాయి.", "type": "log-info"}]
         st.rerun()
 
 # ప్రధాన టెక్స్ట్ ఏరియా
@@ -128,7 +177,7 @@ if user_input_text != st.session_state.main_text:
     st.session_state.main_text = user_input_text
 
 # ==========================================
-# 3. ఆడియో ఎంపికలు & కస్టమైజేషన్
+# 4. ఆడియో ఎంపికలు & కస్టమైజేషన్
 # ==========================================
 st.divider()
 col_lang, col_voice = st.columns([0.5, 0.5])
@@ -160,7 +209,7 @@ with st.expander("⚙️ ఆప్షనల్ ఆడియో సెట్ట�
         bgm_volume = st.slider("🎵 BGM సౌండ్ (%):", min_value=2, max_value=20, value=6)
 
 # ==========================================
-# 4. యాక్షన్ కంట్రోల్స్ (Action Buttons)
+# 5. యాక్షన్ కంట్రోల్స్ (Action Buttons)
 # ==========================================
 st.markdown("##### 🎯 యాక్షన్ కంట్రోల్స్")
 active_text = st.session_state.main_text.strip()
@@ -194,6 +243,7 @@ with c5:
     if active_text:
         if st.button("📋 కాపీ", use_container_width=True):
             st.code(active_text, language=None)
+            add_log("టెక్స్ట్ క్లిప్‌బోర్డ్‌కు సిద్ధమైంది.", "log-info")
             st.toast("✅ టెక్స్ట్‌ని కాపీ చేసుకోండి!", icon="📋")
     else:
         st.button("📋 కాపీ", disabled=True, use_container_width=True)
@@ -203,14 +253,16 @@ with c6:
         st.session_state.main_text = ""
         st.session_state.audio_bytes_data = None
         st.session_state.last_mic_text = ""
+        add_log("టెక్స్ట్ డేటా క్లియర్ చేయబడింది.", "log-info")
         gc.collect()
         st.rerun()
 
 # ==========================================
-# 5. టెక్స్ట్ టు స్పీచ్ (TTS) ప్రాసెసింగ్
+# 6. టెక్స్ట్ టు స్పీచ్ (TTS) ప్రాసెసింగ్
 # ==========================================
 if convert_btn:
     if active_text:
+        add_log("TTS ఆడియో ప్రాసెసింగ్ మొదలైంది...", "log-action")
         with st.spinner("ఆడియో సిద్ధమవుతోంది... దయచేసి వేచి ఉండండి..."):
             try:
                 clean_txt = re.sub(r'[*#_~`]', '', active_text)
@@ -263,12 +315,15 @@ if convert_btn:
                     final_fp = io.BytesIO()
                     final_sound.export(final_fp, format="mp3")
                     st.session_state.audio_bytes_data = final_fp.getvalue()
+                    add_log("TTS ఆడియో ఫైల్ విజయవంతంగా సిద్ధమైంది!", "log-success")
                     gc.collect()
                     st.success("🎉 ఆడియో విజయవంతంగా సిద్ధమైంది!")
                 else:
+                    add_log("ఆడియో జనరేషన్ విఫలమైంది.", "log-err")
                     st.error("❌ ఆడియో డేటా ఏదీ జనరేట్ కాలేదు!")
 
             except Exception as e:
+                add_log(f"TTS సిస్టమ్ లోపం: {e}", "log-err")
                 st.error("❌ ఆడియో సిస్టమ్‌లో లోపం వచ్చింది:")
                 st.code(traceback.format_exc())
     else:
