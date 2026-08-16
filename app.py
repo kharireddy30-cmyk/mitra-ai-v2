@@ -12,6 +12,8 @@ import traceback
 from datetime import datetime
 import docx
 from streamlit_mic_recorder import speech_to_text
+import urllib.request
+import json
 
 # ==========================================
 # 1. పేజీ సెట్టింగ్స్ & కాంపాక్ట్ UI
@@ -27,6 +29,7 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Mandali&display=swap');
     * { font-family: 'Mandali', 'Segoe UI', Tahoma, sans-serif; }
+    
     .block-container { padding-top: 1rem; padding-bottom: 2rem; }
     div.stButton > button, div.stDownloadButton > button {
         font-weight: 600 !important;
@@ -47,7 +50,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.subheader("🕉️ BRAHMA AI : Studio (Auto Multi-Lingual)")
+st.subheader("🕉️ BRAHMA AI : Studio (AI Text Polish & TTS)")
 
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
@@ -58,7 +61,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Auto Multi-Language Engine Online.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Secrets Linked & Secure.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -67,14 +70,82 @@ def add_log(msg, color="#38bdf8"):
 
 
 # ==========================================
-# 2. మల్టీ-లాంగ్వేజ్ డిటెక్షన్ & రూటింగ్ ఇంజిన్
+# 2. AI టెక్స్ట్ బ్యూటిఫైయర్ (Secrets Integration)
+# ==========================================
+
+def polish_text_with_groq(text):
+    """Streamlit Secrets లోని GROQ_API_KEY ద్వారా పంక్చుయేషన్ & పేరాగ్రాఫ్‌లను తీర్చిదిద్దడం"""
+    groq_key = st.secrets.get("GROQ_API_KEY", "")
+    
+    if not groq_key:
+        add_log("Secrets లో GROQ_API_KEY కనుగొనబడలేదు. రూల్-బేస్డ్ ఇంజిన్ వాడుతోంది.", "#facc15")
+        return fallback_rule_based_polish(text)
+    
+    prompt = f"""You are a professional text beautifier and speech script editor for Telugu, Hindi, and English.
+Task:
+1. Add appropriate commas (,), full stops (.), question marks, and natural pauses to the text so that Text-to-Speech (TTS) voice sounds natural and human-like.
+2. Break long unstructured sentences into clean, meaningful paragraphs and lines.
+3. DO NOT change the original meaning or core words.
+4. Return ONLY the polished and beautifully formatted text without any extra explanation, markdown headers, or chat responses.
+
+Original Text:
+{text}
+"""
+    
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {groq_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3
+    }
+    
+    try:
+        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers, method='POST')
+        with urllib.request.urlopen(req, timeout=12) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            polished = res_data['choices'][0]['message']['content'].strip()
+            return polished
+    except Exception as e:
+        add_log(f"Groq Polish లోపం: {e}", "#f87171")
+        return fallback_rule_based_polish(text)
+
+def fallback_rule_based_polish(text):
+    """ఆఫ్‌లైన్ బ్యాకప్ రూల్-బేస్డ్ ఇంజిన్"""
+    clean_txt = re.sub(r'\s+', ' ', text).strip()
+    connectors = ["అయితే", "మరియు", "కానీ", "కాబట్టి", "అందువల్ల", "ఎందుకంటే", "అలాగే", "మరోవైపు", "తో పాటు", "తర్వాత"]
+    for c in connectors:
+        clean_txt = clean_txt.replace(f" {c} ", f", {c} ")
+        
+    hi_connectors = ["और", "लेकिन", "इसलिए", "क्योंकि", "तो", "परंतु", "तथा"]
+    for hc in hi_connectors:
+        clean_txt = clean_txt.replace(f" {hc} ", f", {hc} ")
+
+    words = clean_txt.split(" ")
+    formatted_chunks = []
+    curr = []
+    for w in words:
+        curr.append(w)
+        if len(curr) >= 14 or w.endswith((".", "।", "!", "?")):
+            formatted_chunks.append(" ".join(curr))
+            curr = []
+    if curr:
+        formatted_chunks.append(" ".join(curr))
+        
+    return ".\n\n".join(formatted_chunks) + ("." if not clean_txt.endswith((".", "।")) else "")
+
+
+# ==========================================
+# 3. కోర్ DSP, STT & డాక్యుమెంట్ ఇంజిన్
 # ==========================================
 
 def detect_chunk_language(text):
-    """ఒక వాక్యంలో ఏ భాష ఎక్కువ ఉందో ఆటోమేటిక్‌గా గుర్తిస్తుంది"""
-    te_count = len(re.findall(r'[\u0C00-\u0C7F]', text))  # తెలుగు
-    hi_count = len(re.findall(r'[\u0900-\u097F]', text))  # హిందీ
-    en_count = len(re.findall(r'[a-zA-Z]', text))          # ఇంగ్లీష్
+    te_count = len(re.findall(r'[\u0C00-\u0C7F]', text))
+    hi_count = len(re.findall(r'[\u0900-\u097F]', text))
+    en_count = len(re.findall(r'[a-zA-Z]', text))
 
     if te_count > hi_count and te_count > en_count:
         return "te"
@@ -82,7 +153,7 @@ def detect_chunk_language(text):
         return "hi"
     elif en_count > 0:
         return "en"
-    return "te"  # డీఫాల్ట్
+    return "te"
 
 def apply_audio_dsp(audio_segment: AudioSegment) -> AudioSegment:
     try:
@@ -106,8 +177,6 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="auto", enable_dsp=True
 
     full_transcript = []
     recognizer = sr.Recognizer()
-
-    # మల్టీ-లాంగ్వేజ్ కోసం సీక్వెన్స్
     target_langs = ["te-IN", "hi-IN", "en-IN"] if lang_code == "auto" else [lang_code]
 
     try:
@@ -116,7 +185,7 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="auto", enable_dsp=True
             sound = apply_audio_dsp(sound)
         
         sound = sound.set_channels(1).set_frame_rate(16000)
-        chunk_length_ms = 45 * 1000  # 45 సెకన్లు
+        chunk_length_ms = 45 * 1000
         total_len = len(sound)
         
         for i in range(0, total_len, chunk_length_ms):
@@ -124,7 +193,6 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="auto", enable_dsp=True
             temp_chunk_wav = f"temp_chunk_{i}.wav"
             chunk_audio.export(temp_chunk_wav, format="wav")
             
-            part_recognized = False
             for test_lang in target_langs:
                 try:
                     with sr.AudioFile(temp_chunk_wav) as source:
@@ -132,7 +200,6 @@ def transcribe_audio_file(uploaded_audio_file, lang_code="auto", enable_dsp=True
                         part_text = recognizer.recognize_google(audio_data, language=test_lang)
                         if part_text and part_text.strip():
                             full_transcript.append(part_text.strip())
-                            part_recognized = True
                             break
                 except Exception:
                     continue
@@ -212,7 +279,7 @@ def create_printable_pdf_html(text):
 
 
 # ==========================================
-# 3. ఇన్‌పుట్ విభాగాలు (DOC | AUDIO | MIC)
+# 4. ఇన్‌పుట్ విభాగాలు (DOC | AUDIO | MIC)
 # ==========================================
 with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
     c_file, c_audio_stt, c_mic = st.columns([0.33, 0.34, 0.33])
@@ -269,13 +336,30 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             add_log(f"MIC: '{spoken_result}'", "#4ade80")
             st.rerun()
 
+
 # ==========================================
-# 4. MAIN TEXT CONTENT
+# 5. MAIN TEXT CONTENT & AI POLISH BAR
 # ==========================================
+col_hdr, col_polish = st.columns([0.65, 0.35])
+with col_hdr:
+    st.markdown("##### 📝 టెక్స్ట్ ఎడిటర్ (Text Script)")
+with col_polish:
+    if st.button("✨ సుందరీకరించు (AI Polish)", use_container_width=True, help="పంక్చుయేషన్, పేరాగ్రాఫ్‌లు మరియు సహజ విరామాలను సరిచేస్తుంది"):
+        if st.session_state.main_text.strip():
+            with st.spinner("AI ద్వారా టెక్స్ట్‌ని అందంగా తీర్చిదిద్దుతోంది..."):
+                polished = polish_text_with_groq(st.session_state.main_text)
+                if polished:
+                    st.session_state.main_text = polished
+                    add_log("టెక్స్ట్ విజయవంతంగా సుందరీకరించబడింది!", "#38bdf8")
+                    st.toast("✨ టెక్స్ట్ శ్రావ్యమైన ఆడియో కోసం సిద్ధమైంది!", icon="✨")
+                    st.rerun()
+        else:
+            st.warning("దయచేసి ముందుగా టెక్స్ట్‌ను ఎంటర్ చేయండి.")
+
 user_input_text = st.text_area(
     "Content Editor", 
     value=st.session_state.main_text, 
-    height=150,
+    height=160,
     placeholder="Text content appears here...",
     label_visibility="collapsed"
 )
@@ -284,7 +368,7 @@ if user_input_text != st.session_state.main_text:
 
 
 # ==========================================
-# 5. TTS SETTINGS (Auto Smart Route Support)
+# 6. TTS SETTINGS & CONTROLS
 # ==========================================
 with st.expander("⚙️ TTS SETTINGS & CONTROLS (Multi-Language Auto Support)", expanded=True):
     col_tts_lang, col_tts_voice = st.columns([0.45, 0.55])
@@ -311,7 +395,7 @@ with st.expander("⚙️ TTS SETTINGS & CONTROLS (Multi-Language Auto Support)",
 
 
 # ==========================================
-# 6. ACTION CONTROLS
+# 7. ACTION CONTROLS
 # ==========================================
 active_text = st.session_state.main_text.strip()
 b1, b2, b3 = st.columns(3)
@@ -356,19 +440,18 @@ with b6:
 
 
 # ==========================================
-# 7. ఆటో మల్టీ-లాంగ్వేజ్ TTS జనరేషన్ ఇంజిన్
+# 8. ఆటో మల్టీ-లాంగ్వేజ్ TTS జనరేషన్ ఇంజిన్
 # ==========================================
 if convert_btn:
     if active_text:
         add_log(f"TTS Started: Mode={tts_lang}", "#c084fc")
-        with st.spinner("Generating Multi-Language Voice..."):
+        with st.spinner("Generating Natural Voice..."):
             try:
                 clean_txt = re.sub(r'[*#_~`]', '', active_text)
                 rate_str = f"{int((audio_speed - 1.0) * 100):+d}%"
                 pitch_val_map = {"Normal": "+0Hz", "Deep Base": "-5Hz", "Heavy Base": "-10Hz"}
                 pitch_str = pitch_val_map[pitch_custom]
 
-                # వాయిస్ మ్యాపింగ్
                 voice_dict = {
                     "te": "te-IN-MohanNeural" if "Male" in gender_choice else "te-IN-ShrutiNeural",
                     "hi": "hi-IN-MadhurNeural" if "Male" in gender_choice else "hi-IN-SwaraNeural",
@@ -380,7 +463,6 @@ if convert_btn:
                 silence_pause = AudioSegment.silent(duration=int(pause_duration * 1000))
 
                 for i, chunk in enumerate(text_chunks):
-                    # ఆటో డిటెక్షన్ లేదా మాన్యువల్ సెలెక్షన్
                     if "Auto" in tts_lang:
                         detected_l = detect_chunk_language(chunk)
                         chosen_voice = voice_dict[detected_l]
