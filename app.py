@@ -49,7 +49,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.subheader("🕉️ BRAHMA AI : Studio (Voiceover & AI Poster)")
+st.subheader("🕉️ BRAHMA AI : Studio (Voiceover & Smart Poster)")
 
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
@@ -62,7 +62,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. AI Magic Stickers & Audio Online.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Layout & Poster Engine Online.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -215,9 +215,9 @@ def create_printable_pdf_html(text):
 
 
 # ==========================================
-# 3. AI స్పీచ్ స్టైల్ & స్టిక్కర్ మ్యాజిక్ సెట్టింగ్స్
+# 3. AI కంట్రోల్స్ & మ్యాన్యువల్ లేఅవుట్ సెట్టింగ్స్
 # ==========================================
-with st.expander("⚙️ AI CONTROLS & MAGIC STICKERS (స్టైల్, థీమ్ & స్టిక్కర్లు)", expanded=False):
+with st.expander("⚙️ AI CONTROLS, STICKERS & POSTER LAYOUT", expanded=False):
     col_style, col_pause = st.columns(2)
     with col_style:
         selected_style = st.selectbox("🎭 స్పీచ్ స్టైల్:", options=["📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)", "🧘 ఆధ్యాత్మికం (Spiritual & Calm)", "📰 న్యూస్ రీడర్ (News Bulletin)", "🗣️ సంభాషణ / కబుర్లు (Conversational)"])
@@ -242,7 +242,16 @@ with st.expander("⚙️ AI CONTROLS & MAGIC STICKERS (స్టైల్, థ�
             ]
         )
 
-    custom_sticker_file = st.file_uploader("🖼️ కస్టమ్ లోగో/స్టిక్కర్ అప్‌లోడ్ (Optional Custom Sticker):", type=["png", "jpg", "jpeg", "webp"], key="cust_sticker_up")
+    # మ్యాన్యువల్ పోస్టర్ లేఅవుట్ ఆప్షన్లు
+    col_mode, col_align, col_fsize = st.columns(3)
+    with col_mode:
+        content_mode = st.selectbox("📝 కంటెంట్ మోడ్:", options=["📜 పూర్తి మ్యాటర్ (Full Exact Text)", "🤖 AI సారాంశం (Summary Points)"])
+    with col_align:
+        text_align = st.selectbox("📐 టెక్స్ట్ అమరిక (Alignment):", options=["ఎడమ వైపు (Left)", "మధ్యలో (Center)", "సమానంగా (Justify)"])
+    with col_fsize:
+        font_size_choice = st.selectbox("🔤 అక్షరాల సైజు (Font Size):", options=["మధ్యస్థం (Medium - 18px)", "చిన్నది (Small - 15px)", "పెద్దది (Large - 22px)", "చాలా పెద్దది (X-Large - 26px)"])
+
+    custom_sticker_file = st.file_uploader("🖼️ కస్టమ్ లోగో/స్టిక్కర్ అప్‌లోడ్:", type=["png", "jpg", "jpeg", "webp"], key="cust_sticker_up")
     custom_ai_note = st.text_input("💡 AIకి ప్రత్యేక ఆదేశం (Optional):", placeholder="ఉదా: తేదీలు, ముఖ్యమైన పిలుపుల వద్ద పాజ్ ఇవ్వాలి...")
 
 
@@ -378,16 +387,19 @@ with b1:
 with b2:
     if active_text:
         if st.button("🖼️ AI POSTER", use_container_width=True):
-            with st.spinner("Groq AI & స్టిక్కర్ ఇంజిన్ ద్వారా పోస్టర్ డిజైన్ అవుతోంది..."):
+            with st.spinner("పోస్టర్ లేఅవుట్ సిద్ధమవుతోంది..."):
                 poster_html = generate_ai_poster_html(
                     active_text, 
                     theme=poster_theme, 
                     sticker_choice=sticker_choice, 
+                    content_mode=content_mode,
+                    text_align=text_align,
+                    font_size_choice=font_size_choice,
                     custom_sticker_file=custom_sticker_file
                 )
                 st.session_state.poster_html_data = poster_html
-                add_log(f"AI పోస్టర్ సిద్ధమైంది! (Sticker: {sticker_choice})", "#4ade80")
-                st.toast("🖼️ AI పోస్టర్ సిద్ధమైంది!", icon="🖼️")
+                add_log("పోస్టర్ సిద్ధమైంది!", "#4ade80")
+                st.toast("🖼️ పోస్టర్ సిద్ధమైంది!", icon="🖼️")
     else:
         st.button("🖼️ AI POSTER", disabled=True, use_container_width=True)
 
@@ -437,7 +449,7 @@ with b7:
 # ==========================================
 if st.session_state.poster_html_data is not None:
     st.divider()
-    st.markdown("### 🖼️ AI గ్రాఫిక్ పోస్టర్ కార్డ్ (Graphic Poster Card)")
+    st.markdown("### 🖼️ పోస్టర్ కార్డ్ ప్రివ్యూ (Smart Poster Card)")
     st.components.v1.html(st.session_state.poster_html_data, height=830, scrolling=True)
 
 
