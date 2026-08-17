@@ -433,20 +433,12 @@ with b7:
 
 
 # ==========================================
-# 8. AI పోస్టర్ ప్రివ్యూ & సేవ్ విభాగం
+# 8. AI పోస్టర్ ప్రివ్యూ విభాగం
 # ==========================================
 if st.session_state.poster_html_data is not None:
     st.divider()
     st.markdown("### 🖼️ AI గ్రాఫిక్ పోస్టర్ కార్డ్ (Graphic Poster Card)")
-    st.components.v1.html(st.session_state.poster_html_data, height=800, scrolling=True)
-    
-    st.download_button(
-        label="📥 పోస్టర్ డౌన్‌లోడ్ చేసుకోండి (Download Poster HTML/Card)",
-        data=st.session_state.poster_html_data.encode('utf-8'),
-        file_name="ai_graphic_poster.html",
-        mime="text/html",
-        use_container_width=True
-    )
+    st.components.v1.html(st.session_state.poster_html_data, height=830, scrolling=True)
 
 
 # ==========================================
