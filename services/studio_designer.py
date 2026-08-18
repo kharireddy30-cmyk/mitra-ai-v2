@@ -124,7 +124,7 @@ def render_live_studio_poster(
         try:
             custom_bg_file.seek(0)
             bg_b64 = base64.b64encode(custom_bg_file.read()).decode()
-            bg_mime = custom_bg_file.type or "image/png"
+            bg_mime = custom_bg_file.type or ("image/gif" if custom_bg_file.name.lower().endswith(".gif") else "image/png")
             bg_style = f"url('data:{bg_mime};base64,{bg_b64}') center/contain no-repeat #000000"
             has_custom_bg = True
         except Exception:
@@ -150,7 +150,7 @@ def render_live_studio_poster(
         try:
             custom_sticker_file.seek(0)
             b64_data = base64.b64encode(custom_sticker_file.read()).decode()
-            mime_type = custom_sticker_file.type or "image/png"
+            mime_type = custom_sticker_file.type or ("image/gif" if custom_sticker_file.name.lower().endswith(".gif") else "image/png")
             custom_img_html = f"<img src='data:{mime_type};base64,{b64_data}' style='width: 52px; height: 52px; object-fit: contain; border-radius: 50%; border: 2px solid #facc15;' />"
         except Exception:
             pass
@@ -333,7 +333,7 @@ def render_live_studio_poster(
     </div>
   </div>
 
-  <!-- మధ్యలో పోస్టర్ కార్డ్ (Center Full Poster with Drag Support) -->
+  <!-- మధ్యలో పోస్టర్ కార్డ్ (Center Full Poster with Drag Support & GIF Background) -->
   <div class="center-stage">
     <div class="poster-card" id="posterCard">
       <div class="sparkle-decor" style="top: 20px; left: 25px;">✨</div>
