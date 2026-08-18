@@ -34,7 +34,8 @@ def generate_ai_poster_html(
     content_mode="📜 పూర్తి మ్యాటర్ (Full Exact Text)",
     text_align="ఎడమ వైపు (Left)",
     font_size_choice="మధ్యస్థం (Medium - 18px)",
-    custom_sticker_file=None
+    custom_sticker_file=None,
+    custom_bg_file=None
 ):
     if not text or not text.strip():
         return ""
@@ -45,7 +46,17 @@ def generate_ai_poster_html(
         "ప్రకృతి / పచ్చదనం (Nature Green)": "linear-gradient(135deg, #04382a 0%, #065f46 50%, #02231b 100%)",
         "రాయల్ బ్లూ (Corporate & Formal)": "linear-gradient(135deg, #091326 0%, #172d5c 50%, #060e1d 100%)"
     }
-    bg_gradient = theme_styles.get(theme, theme_styles["ఆధ్యాత్మికం (Golden Divine)"])
+    bg_style = theme_styles.get(theme, theme_styles["ఆధ్యాత్మికం (Golden Divine)"])
+
+    # యూజర్ ఎంప్టీ బ్యాక్‌గ్రౌండ్ ఇమేజ్ అప్‌లోడ్ చేస్తే:
+    if custom_bg_file is not None:
+        try:
+            custom_bg_file.seek(0)
+            bg_b64 = base64.b64encode(custom_bg_file.read()).decode()
+            bg_mime = custom_bg_file.type or "image/png"
+            bg_style = f"url('data:{bg_mime};base64,{bg_b64}') center/cover no-repeat"
+        except Exception:
+            pass
 
     font_size_map = {
         "చిన్నది (Small - 15px)": "15px",
@@ -90,7 +101,7 @@ def generate_ai_poster_html(
 <html lang="te">
 <head>
 <meta charset="utf-8">
-<title>BRAHMA AI - Smart Poster & Animated GIF</title>
+<title>BRAHMA AI - Poster & Animated GIF</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.3.2/gifshot.min.js"></script>
 <style>
@@ -103,13 +114,12 @@ def generate_ai_poster_html(
   .btn-gif {{ background: #ec4899; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4); }}
   
   .poster-card {{
-      width: 100%; max-width: 580px; min-height: 720px; background: {bg_gradient}; border: 4px solid #facc15;
+      width: 100%; max-width: 580px; min-height: 720px; background: {bg_style}; border: 4px solid #facc15;
       border-radius: 22px; padding: 28px 24px; color: #ffffff; box-shadow: 0 18px 40px rgba(0,0,0,0.7);
       position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between;
   }}
   .inner-border {{ position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; border: 1px dashed rgba(250, 204, 21, 0.4); border-radius: 16px; pointer-events: none; }}
   
-  /* మెరిసే యానిమేషన్లు (Glowing & Shimmer Animation) */
   @keyframes glowText {{
       0% {{ text-shadow: 0 0 6px rgba(250, 204, 21, 0.4); }}
       50% {{ text-shadow: 0 0 20px rgba(250, 204, 21, 0.9), 0 0 30px #f59e0b; }}
@@ -121,16 +131,16 @@ def generate_ai_poster_html(
       100% {{ transform: scale(1); filter: drop-shadow(0 0 5px #facc15); }}
   }}
   
-  .spark-title {{ animation: glowText 2s infinite ease-in-out; color: #facc15; font-size: 26px; font-weight: bold; line-height: 1.3; margin-top: 6px; }}
+  .spark-title {{ animation: glowText 2s infinite ease-in-out; color: #facc15; font-size: 26px; font-weight: bold; line-height: 1.3; margin-top: 6px; text-shadow: 0 2px 8px rgba(0,0,0,0.8); }}
   .spark-elem {{ animation: sparkleBadge 2s infinite ease-in-out; font-size: 45px; display: inline-block; }}
 
   .header {{ text-align: center; margin-bottom: 12px; position: relative; z-index: 2; }}
   .content-box {{
-      background: rgba(0, 0, 0, 0.4); border-radius: 14px; padding: 18px; margin: 10px 0;
-      border: 1px solid rgba(255, 255, 255, 0.12); position: relative; z-index: 2;
-      font-size: {f_size}; text-align: {t_align}; color: #f8fafc;
+      background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(4px); border-radius: 14px; padding: 18px; margin: 10px 0;
+      border: 1px solid rgba(255, 255, 255, 0.15); position: relative; z-index: 2;
+      font-size: {f_size}; text-align: {t_align}; color: #f8fafc; text-shadow: 0 1px 4px rgba(0,0,0,0.8);
   }}
-  .footer {{ text-align: center; background: rgba(250, 204, 21, 0.15); border: 1px solid #facc15; border-radius: 10px; padding: 10px; margin-top: 10px; position: relative; z-index: 2; }}
+  .footer {{ text-align: center; background: rgba(0, 0, 0, 0.6); border: 1px solid #facc15; border-radius: 10px; padding: 10px; margin-top: 10px; position: relative; z-index: 2; }}
   .footer-quote {{ font-size: 19px; font-weight: bold; color: #fde047; margin: 0; animation: glowText 2.5s infinite; }}
   
   #gifStatus {{ color: #ec4899; font-size: 14px; font-weight: bold; margin-bottom: 10px; display: none; }}
@@ -141,7 +151,7 @@ def generate_ai_poster_html(
   <button class="btn-png" onclick="saveAsImage()">📸 ఇమేజ్ (.PNG)</button>
   <button class="btn-gif" onclick="generateAnimatedGIF()">✨ యానిమేటెడ్ GIF డౌన్‌లోడ్</button>
 </div>
-<div id="gifStatus">⏳ యానిమేటెడ్ GIF ఫ్రేమ్స్ సిద్ధమవుతున్నాయి... దయచేసి 3 సెకన్లు ఆగండి...</div>
+<div id="gifStatus">⏳ యానిమేటెడ్ GIF తయారవుతోంది... దయచేసి 3 సెకన్లు ఆగండి...</div>
 
 <div class="poster-card" id="posterCard">
   <div class="inner-border"></div>
@@ -163,7 +173,7 @@ function saveAsImage() {{
     const target = document.getElementById("posterCard");
     html2canvas(target, {{ scale: 2.5, useCORS: true, backgroundColor: null }}).then(canvas => {{
         const link = document.createElement("a");
-        link.download = "brahma_ai_poster.png";
+        link.download = "brahma_poster.png";
         link.href = canvas.toDataURL("image/png");
         link.click();
     }});
@@ -174,12 +184,11 @@ function generateAnimatedGIF() {{
     statusDiv.style.display = "block";
     const target = document.getElementById("posterCard");
 
-    // బ్రౌజర్‌లోనే 5 అందమైన యానిమేటెడ్ ఫ్రేమ్స్‌ను క్యాప్చర్ చేస్తుంది
     let frames = [];
     let count = 0;
     
     function captureFrame() {{
-        html2canvas(target, {{ scale: 1.5, useCORS: true }}).then(canvas => {{
+        html2canvas(target, {{ scale: 1.4, useCORS: true }}).then(canvas => {{
             frames.push(canvas.toDataURL("image/png"));
             count++;
             if (count < 6) {{
@@ -187,8 +196,8 @@ function generateAnimatedGIF() {{
             }} else {{
                 gifshot.createGIF({{
                     images: frames,
-                    gifWidth: 480,
-                    gifHeight: 620,
+                    gifWidth: 460,
+                    gifHeight: 600,
                     interval: 0.25,
                     numFrames: 6
                 }}, function(obj) {{
