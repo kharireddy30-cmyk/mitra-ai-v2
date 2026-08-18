@@ -13,7 +13,7 @@ from datetime import datetime
 import docx
 from streamlit_mic_recorder import speech_to_text
 from services.groq_polisher import polish_speech_script
-from services.image_poster import generate_ai_poster_html
+from services.studio_designer import render_live_studio_poster
 
 # ==========================================
 # 1. పేజీ సెట్టింగ్స్ & UI స్టైల్స్
@@ -49,7 +49,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.subheader("🕉️ BRAHMA AI : Studio (Voiceover & Smart Poster)")
+st.subheader("🕉️ BRAHMA AI : Studio (Voiceover & Live Smart Poster)")
 
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
@@ -62,7 +62,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Voice & Poster Engine Online.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Voice & Live Canvas Studio Online.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -391,8 +391,8 @@ with b1:
 with b2:
     if active_text:
         if st.button("🖼️ AI POSTER", use_container_width=True):
-            with st.spinner("పోస్టర్ & యానిమేషన్ సిద్ధమవుతోంది..."):
-                poster_html = generate_ai_poster_html(
+            with st.spinner("లైవ్ పోస్టర్ స్టూడియో సిద్ధమవుతోంది..."):
+                poster_html = render_live_studio_poster(
                     active_text, 
                     theme=poster_theme, 
                     sticker_choice=sticker_choice, 
@@ -403,7 +403,7 @@ with b2:
                     custom_bg_file=custom_bg_file
                 )
                 st.session_state.poster_html_data = poster_html
-                add_log("పోస్టర్ సిద్ధమైంది!", "#4ade80")
+                add_log("లైవ్ పోస్టర్ స్టూడియో సిద్ధమైంది!", "#4ade80")
                 st.toast("🖼️ పోస్టర్ సిద్ధమైంది!", icon="🖼️")
     else:
         st.button("🖼️ AI POSTER", disabled=True, use_container_width=True)
@@ -450,12 +450,12 @@ with b7:
 
 
 # ==========================================
-# 8. AI పోస్టర్ & GIF ప్రివ్యూ విభాగం
+# 8. AI పోస్టర్ & GIF లైవ్ ప్రివ్యూ విభాగం
 # ==========================================
 if st.session_state.poster_html_data is not None:
     st.divider()
-    st.markdown("### 🖼️ పోస్టర్ కార్డ్ & GIF ప్రివ్యూ (Smart Poster Card)")
-    st.components.v1.html(st.session_state.poster_html_data, height=860, scrolling=True)
+    st.markdown("### 🖼️ లైవ్ పోస్టర్ & GIF స్టూడియో (Interactive Live Studio)")
+    st.components.v1.html(st.session_state.poster_html_data, height=920, scrolling=True)
 
 
 # ==========================================
