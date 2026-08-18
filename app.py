@@ -9,7 +9,7 @@ from services.groq_polisher import polish_and_translate_script
 from services.image_poster import generate_ai_poster_html
 
 # ==========================================
-# 1. పేజీ సెట్టింగ్స్ & స్టైల్స్
+# 1. పేజీ సెట్టింగ్స్ & UI స్టైల్స్
 # ==========================================
 st.set_page_config(
     page_title="BRAHMA AI Studio", 
@@ -49,6 +49,8 @@ if "main_text" not in st.session_state:
     st.session_state.main_text = ""
 if "translated_text" not in st.session_state:
     st.session_state.translated_text = ""
+if "trans_key_counter" not in st.session_state:
+    st.session_state.trans_key_counter = 0
 if "audio_bytes_data" not in st.session_state:
     st.session_state.audio_bytes_data = None
 if "poster_html_data" not in st.session_state:
@@ -134,6 +136,7 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC / PASTE)", expanded=
                 f_text = extract_text_from_file(uploaded_file)
                 if f_text and f_text != st.session_state.main_text:
                     st.session_state.main_text = f_text
+                    st.session_state.translated_text = ""
                     add_log(f"DOC Loaded: {uploaded_file.name}", "#4ade80")
                     st.toast(f"✅ {uploaded_file.name} Loaded!")
             except Exception as fe:
@@ -155,6 +158,7 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC / PASTE)", expanded=
                     raw_txt = transcribe_audio_file(uploaded_audio, lang_code=selected_stt_lang, enable_dsp=use_dsp)
                     if raw_txt and not raw_txt.startswith("⚠️"):
                         st.session_state.main_text = raw_txt.strip()
+                        st.session_state.translated_text = ""
                         add_log(f"STT Ready ({len(raw_txt)} chars)", "#4ade80")
                         st.toast("✅ టెక్స్ట్ లోడ్ అయింది!")
                         st.rerun()
@@ -174,6 +178,7 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC / PASTE)", expanded=
         )
         if spoken_result and spoken_result != st.session_state.last_mic_text:
             st.session_state.main_text = (st.session_state.main_text + "\n\n" + spoken_result).strip()
+            st.session_state.translated_text = ""
             st.session_state.last_mic_text = spoken_result
             add_log(f"MIC: '{spoken_result}'", "#4ade80")
             st.rerun()
@@ -195,7 +200,7 @@ if user_input_text != st.session_state.main_text:
 
 
 # ==========================================
-# 5. రెండు బాక్సుల మధ్య ట్రాన్స్‌లేటర్ బార్ (Middle Translation Bar)
+# 5. మధ్యలో ట్రాన్స్‌లేటర్ బార్ (Middle Translation Bar)
 # ==========================================
 col_mid_lbl, col_mid_lang, col_mid_btn = st.columns([0.25, 0.45, 0.3])
 
@@ -218,7 +223,7 @@ with col_mid_lang:
 with col_mid_btn:
     if st.button("✨ అప్లై / అనువదించు (Apply Translation)", type="secondary", use_container_width=True):
         if st.session_state.main_text.strip():
-            with st.spinner("ఎంచుకున్న భాషలోకి అనువదిస్తోంది..."):
+            with st.spinner(f"{target_trans_lang} లోకి ఖచ్చితంగా అనువదిస్తోంది..."):
                 translated_res = polish_and_translate_script(
                     st.session_state.main_text, 
                     target_lang=target_trans_lang, 
@@ -227,6 +232,7 @@ with col_mid_btn:
                 )
                 if translated_res:
                     st.session_state.translated_text = translated_res
+                    st.session_state.trans_key_counter += 1
                     add_log(f"అనువాదం పూర్తయింది -> {target_trans_lang}", "#38bdf8")
                     st.toast(f"✨ అనువాదం సిద్ధమైంది ({target_trans_lang})!", icon="✨")
                     st.rerun()
@@ -238,17 +244,19 @@ with col_mid_btn:
 # 6. బాక్స్ 2: అనువాద ఫలితం (Final Translated Script)
 # ==========================================
 st.markdown("##### ✨ గౌరవప్రదమైన స్పీచ్ & అనువాద స్క్రిప్ట్ (Final Translated Script)")
+active_default_val = st.session_state.translated_text if st.session_state.translated_text else st.session_state.main_text
 trans_area = st.text_area(
     "Translated Content", 
-    value=st.session_state.translated_text if st.session_state.translated_text else st.session_state.main_text, 
+    value=active_default_val, 
     height=130,
+    key=f"trans_area_box_{st.session_state.trans_key_counter}",
     label_visibility="collapsed"
 )
-if trans_area != st.session_state.translated_text:
+if trans_area != st.session_state.translated_text and st.session_state.translated_text != "":
     st.session_state.translated_text = trans_area
 
-# ఆడియో & పోస్టర్ కోసం యాక్టివ్ టెక్స్ట్ నిర్ణయం
-active_text = st.session_state.translated_text.strip() if st.session_state.translated_text.strip() else st.session_state.main_text.strip()
+# ఆడియో & పోస్టర్ కోసం యాక్టివ్ టెక్స్ట్
+active_text = trans_area.strip() if trans_area.strip() else st.session_state.main_text.strip()
 
 
 # ==========================================
@@ -337,6 +345,7 @@ with b7:
     if st.button("🧹 CLEAR", use_container_width=True):
         st.session_state.main_text = ""
         st.session_state.translated_text = ""
+        st.session_state.trans_key_counter += 1
         st.session_state.audio_bytes_data = None
         st.session_state.poster_html_data = None
         st.session_state.last_mic_text = ""
