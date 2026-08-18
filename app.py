@@ -253,11 +253,12 @@ with st.expander("⚙️ AI CONTROLS, STICKERS & POSTER LAYOUT", expanded=False)
 
     col_bg_up, col_stk_up = st.columns(2)
     with col_bg_up:
-        custom_bg_file = st.file_uploader("🖼️ కస్టమ్ బ్యాక్‌గ్రౌండ్ ఇమేజ్ (ఎంప్టీ టెంప్లేట్):", type=["png", "jpg", "jpeg", "webp"], key="cust_bg_up")
+        # యానిమేటెడ్ GIF ఫైల్స్ సపోర్ట్‌తో కూడిన అప్‌లోడర్
+        custom_bg_file = st.file_uploader("🖼️ కస్టమ్ బ్యాక్‌గ్రౌండ్ ఇమేజ్ / యానిమేటెడ్ GIF:", type=["png", "jpg", "jpeg", "webp", "gif"], key="cust_bg_up")
     with col_stk_up:
-        custom_sticker_file = st.file_uploader("🏷️ కస్టమ్ లోగో/స్టిక్కర్ అప్‌లోడ్:", type=["png", "jpg", "jpeg", "webp"], key="cust_sticker_up")
+        custom_sticker_file = st.file_uploader("🏷️ కస్టమ్ లోగో/స్టిక్కర్ అప్‌లోడ్ (GIF/PNG):", type=["png", "jpg", "jpeg", "webp", "gif"], key="cust_sticker_up")
 
-    custom_ai_note = st.text_input("💡 AIకి ప్రత్యేక ఆదేశం (Optional):", placeholder="ఉదా: తేదీలు, ముఖ్యమైన పిలుపుల వద్ద పాజ్ ఇవ్వాలి...")
+    custom_ai_note = st.text_input("💡 AIకి ప్రత్యేక ఆదేశం (Optional):", placeholder="ఉదా: ఆధ్యాత్మిక శైలిలో తేదీలు, ముఖ్యమైన లైన్లను హైలైట్ చేయండి...")
 
 
 # ==========================================
@@ -392,7 +393,7 @@ with b1:
 with b2:
     if active_text:
         if st.button("🖼️ AI POSTER", use_container_width=True):
-            with st.spinner("పోస్టర్ లేఅవుట్ సిద్ధమవుతోంది..."):
+            with st.spinner("లైవ్ స్టూడియో సిద్ధమవుతోంది..."):
                 poster_html = render_live_studio_poster(
                     active_text, 
                     theme=poster_theme, 
@@ -401,7 +402,8 @@ with b2:
                     text_align=text_align,
                     font_size_choice=font_size_choice,
                     custom_sticker_file=custom_sticker_file,
-                    custom_bg_file=custom_bg_file
+                    custom_bg_file=custom_bg_file,
+                    user_prompt=custom_ai_note
                 )
                 st.session_state.poster_html_data = poster_html
                 add_log("పోస్టర్ సిద్ధమైంది!", "#4ade80")
