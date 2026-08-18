@@ -49,7 +49,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.subheader("🕉️ BRAHMA AI : Studio (Voiceover & Live Smart Poster)")
+st.subheader("🕉️ BRAHMA AI : Studio (Voiceover & AI Poster)")
 
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
@@ -62,7 +62,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Voice & Live Canvas Studio Online.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Voice & Groq AI Poster Engine Online.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -215,40 +215,14 @@ def create_printable_pdf_html(text):
 
 
 # ==========================================
-# 3. AI కంట్రోల్స్ & మ్యాన్యువల్ లేఅవుట్ సెట్టింగ్స్
+# 3. AI కంట్రోల్స్ & పోస్టర్ ప్రాంప్ట్ సెట్టింగ్స్
 # ==========================================
-with st.expander("⚙️ AI CONTROLS, STICKERS & POSTER LAYOUT", expanded=False):
+with st.expander("⚙️ AI CONTROLS, TEMPLATE & DESIGN PROMPT", expanded=False):
     col_style, col_pause = st.columns(2)
     with col_style:
         selected_style = st.selectbox("🎭 స్పీచ్ స్టైల్:", options=["📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)", "🧘 ఆధ్యాత్మికం (Spiritual & Calm)", "📰 న్యూస్ రీడర్ (News Bulletin)", "🗣️ సంభాషణ / కబుర్లు (Conversational)"])
     with col_pause:
         selected_pause = st.selectbox("⏱️ శ్వాస విరామాలు:", options=["మధ్యస్థం (Normal Pauses)", "ఎక్కువ (Deep Breathing / Heavy Pauses)", "స్వల్పం (Fast / Light Pauses)"])
-
-    col_th, col_stk = st.columns(2)
-    with col_th:
-        poster_theme = st.selectbox("🎨 పోస్టర్ కలర్ థీమ్:", options=["ఆధ్యాత్మికం (Golden Divine)", "రక్తదానం / సేవా కార్యక్రమం (Red & White)", "ప్రకృతి / పచ్చదనం (Nature Green)", "రాయల్ బ్లూ (Corporate & Formal)"])
-    with col_stk:
-        sticker_choice = st.selectbox(
-            "🏷️ AI స్టిక్కర్స్ / బ్యాడ్జ్ ఎంపిక:",
-            options=[
-                "🪄 AI మ్యాజిక్ (Auto Select)",
-                "🕉️ ఓం (Divine Om)",
-                "🪷 పద్మం (Sacred Lotus)",
-                "🩸 రక్తదానం (Blood Drop)",
-                "🕊️ శాంతి కపోతం (Peace Dove)",
-                "🌟 గోల్డెన్ స్టార్ (Golden Star)",
-                "📜 రాయల్ సీల్ (Royal Seal)",
-                "❤️ సేవా హస్తం (Loving Care)"
-            ]
-        )
-
-    col_mode, col_align, col_fsize = st.columns(3)
-    with col_mode:
-        content_mode = st.selectbox("📝 కంటెంట్ మోడ్:", options=["📜 పూర్తి మ్యాటర్ (Full Exact Text)", "🤖 AI సారాంశం (Summary Points)"])
-    with col_align:
-        text_align = st.selectbox("📐 టెక్స్ట్ అమరిక (Alignment):", options=["ఎడమ వైపు (Left)", "మధ్యలో (Center)", "సమానంగా (Justify)"])
-    with col_fsize:
-        font_size_choice = st.selectbox("🔤 అక్షరాల సైజు (Font Size):", options=["మధ్యస్థం (Medium - 18px)", "చిన్నది (Small - 15px)", "పెద్దది (Large - 22px)", "చాలా పెద్దది (X-Large - 26px)"])
 
     col_bg_up, col_stk_up = st.columns(2)
     with col_bg_up:
@@ -256,7 +230,11 @@ with st.expander("⚙️ AI CONTROLS, STICKERS & POSTER LAYOUT", expanded=False)
     with col_stk_up:
         custom_sticker_file = st.file_uploader("🏷️ కస్టమ్ లోగో/స్టిక్కర్ అప్‌లోడ్:", type=["png", "jpg", "jpeg", "webp"], key="cust_sticker_up")
 
-    custom_ai_note = st.text_input("💡 AIకి ప్రత్యేక ఆదేశం (Optional):", placeholder="ఉదా: తేదీలు, ముఖ్యమైన పిలుపుల వద్ద పాజ్ ఇవ్వాలి...")
+    user_design_prompt = st.text_input(
+        "💡 AI డిజైన్ కమాండ్ (Prompt):", 
+        placeholder="ఉదా: ఆధ్యాత్మిక లుక్ ఇవ్వండి, కింద శివలింగం ఆరా మెరవాలి, ఎరుపు రంగులో కొటేషన్ హైలైట్ చేయండి...",
+        key="ai_design_prompt_input"
+    )
 
 
 # ==========================================
@@ -273,7 +251,7 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
                 f_text = extract_text_from_file(uploaded_file)
                 if f_text and f_text != st.session_state.main_text:
                     with st.spinner("AI Speech Formatting..."):
-                        polished = polish_speech_script(f_text, selected_style, selected_pause, custom_ai_note)
+                        polished = polish_speech_script(f_text, selected_style, selected_pause, user_design_prompt)
                         st.session_state.main_text = polished if polished else f_text
                     add_log(f"DOC Loaded: {uploaded_file.name}", "#4ade80")
                     st.toast(f"✅ {uploaded_file.name} Loaded!")
@@ -293,7 +271,7 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             if st.button("🚀 RUN STT", use_container_width=True):
                 add_log(f"STT Started: {uploaded_audio.name} ({stt_lang_choice})", "#c084fc")
                 with st.spinner("Transcribing & Formatting with AI..."):
-                    transcribed_txt = transcribe_audio_file(uploaded_audio, lang_code=selected_stt_lang, enable_dsp=use_dsp, style=selected_style, pause=selected_pause, custom_note=custom_ai_note)
+                    transcribed_txt = transcribe_audio_file(uploaded_audio, lang_code=selected_stt_lang, enable_dsp=use_dsp, style=selected_style, pause=selected_pause, custom_note=user_design_prompt)
                     if transcribed_txt and not transcribed_txt.startswith("⚠️"):
                         st.session_state.main_text = transcribed_txt.strip()
                         add_log(f"STT Ready ({len(transcribed_txt)} chars)", "#4ade80")
@@ -315,7 +293,7 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
         )
         if spoken_result and spoken_result != st.session_state.last_mic_text:
             with st.spinner("Formatting Voice with AI..."):
-                polished_live = polish_speech_script(spoken_result, selected_style, selected_pause, custom_ai_note)
+                polished_live = polish_speech_script(spoken_result, selected_style, selected_pause, user_design_prompt)
                 st.session_state.main_text = (st.session_state.main_text + "\n\n" + (polished_live if polished_live else spoken_result)).strip()
             st.session_state.last_mic_text = spoken_result
             add_log(f"MIC: '{spoken_result}' (Polished)", "#4ade80")
@@ -332,7 +310,7 @@ with col_polish:
     if st.button("✨ స్క్రిప్ట్ మార్చు (Re-Polish AI)", use_container_width=True):
         if st.session_state.main_text.strip():
             with st.spinner("AI ద్వారా స్క్రిప్ట్ సరిచేస్తోంది..."):
-                polished = polish_speech_script(st.session_state.main_text, selected_style, selected_pause, custom_ai_note)
+                polished = polish_speech_script(st.session_state.main_text, selected_style, selected_pause, user_design_prompt)
                 if polished:
                     st.session_state.main_text = polished
                     add_log("స్క్రిప్ట్ రీ-పాలిష్ చేయబడింది!", "#38bdf8")
@@ -391,19 +369,15 @@ with b1:
 with b2:
     if active_text:
         if st.button("🖼️ AI POSTER", use_container_width=True):
-            with st.spinner("లైవ్ పోస్టర్ స్టూడియో సిద్ధమవుతోంది..."):
+            with st.spinner("గ్రోక్ AI డిజైన్ & యానిమేషన్ సిద్ధమవుతోంది..."):
                 poster_html = render_live_studio_poster(
                     active_text, 
-                    theme=poster_theme, 
-                    sticker_choice=sticker_choice, 
-                    content_mode=content_mode,
-                    text_align=text_align,
-                    font_size_choice=font_size_choice,
+                    user_prompt=user_design_prompt,
                     custom_sticker_file=custom_sticker_file,
                     custom_bg_file=custom_bg_file
                 )
                 st.session_state.poster_html_data = poster_html
-                add_log("లైవ్ పోస్టర్ స్టూడియో సిద్ధమైంది!", "#4ade80")
+                add_log("లైవ్ పోస్టర్ & GIF స్టూడియో సిద్ధమైంది!", "#4ade80")
                 st.toast("🖼️ పోస్టర్ సిద్ధమైంది!", icon="🖼️")
     else:
         st.button("🖼️ AI POSTER", disabled=True, use_container_width=True)
