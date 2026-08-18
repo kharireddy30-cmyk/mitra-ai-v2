@@ -57,7 +57,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. BK & Krishna Respectful Translation Engine Online.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Accurate Multilingual Translation Online.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -180,27 +180,45 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC / PASTE)", expanded=
 
 
 # ==========================================
-# 4. స్పీచ్ ఎడిటర్ & ట్రాన్స్‌లేట్ కమాండ్ బార్
+# 4. బాక్స్ 1: మూల వచనం (Source Text Box)
 # ==========================================
-col_hdr, col_lang_sel, col_trans_btn = st.columns([0.4, 0.35, 0.25])
-with col_hdr:
-    st.markdown("##### 📝 మూల వచనం (Source Text Box)")
-with col_lang_sel:
+st.markdown("##### 📝 మూల వచనం (Source Text Box)")
+user_input_text = st.text_area(
+    "Original Source Content", 
+    value=st.session_state.main_text, 
+    height=120,
+    placeholder="ఆడియో/మైక్/ఫైల్ నుంచి వచ్చిన లేదా ఇక్కడ నేరుగా పేస్ట్ చేసిన మూల వచనం...",
+    label_visibility="collapsed"
+)
+if user_input_text != st.session_state.main_text:
+    st.session_state.main_text = user_input_text
+
+
+# ==========================================
+# 5. రెండు బాక్సుల మధ్య ట్రాన్స్‌లేటర్ బార్ (Middle Translation Bar)
+# ==========================================
+col_mid_lbl, col_mid_lang, col_mid_btn = st.columns([0.25, 0.45, 0.3])
+
+with col_mid_lbl:
+    st.markdown("##### 🌐 ట్రాన్స్‌లేటర్ (AI):")
+
+with col_mid_lang:
     target_trans_lang = st.selectbox(
-        "అనువదించాల్సిన భాష:",
+        "మార్చాల్సిన భాష ఎంపిక:",
         options=[
-            "తెలుగు (గౌరవప్రదమైన కృష్ణా యాస / BK)",
             "హిందీ (सरल व आध्यात्मिक शैली)",
+            "తెలుగు (గౌరవప్రదమైన కృష్ణా యాస / BK)",
             "ఇంగ్లీష్ (Dignified English)",
             "🔄 అసలు భాష (Original Polish Only)"
         ],
         index=0,
         label_visibility="collapsed"
     )
-with col_trans_btn:
-    if st.button("✨ అనువదించు / మార్చు (Translate AI)", use_container_width=True):
+
+with col_mid_btn:
+    if st.button("✨ అప్లై / అనువదించు (Apply Translation)", type="secondary", use_container_width=True):
         if st.session_state.main_text.strip():
-            with st.spinner("BK & కృష్ణా జిల్లా గౌరవ శైలిలో అనువదిస్తోంది..."):
+            with st.spinner("ఎంచుకున్న భాషలోకి అనువదిస్తోంది..."):
                 translated_res = polish_and_translate_script(
                     st.session_state.main_text, 
                     target_lang=target_trans_lang, 
@@ -210,40 +228,31 @@ with col_trans_btn:
                 if translated_res:
                     st.session_state.translated_text = translated_res
                     add_log(f"అనువాదం పూర్తయింది -> {target_trans_lang}", "#38bdf8")
-                    st.toast("✨ గౌరవప్రదమైన అనువాదం సిద్ధమైంది!", icon="✨")
+                    st.toast(f"✨ అనువాదం సిద్ధమైంది ({target_trans_lang})!", icon="✨")
                     st.rerun()
         else:
-            st.warning("దయచేసి బాక్స్‌లో టెక్స్ట్‌ను ఎంటర్ చేయండి.")
+            st.warning("దయచేసి మూల వచనం బాక్స్‌లో టెక్స్ట్ ఎంటర్ చేయండి.")
 
-# మూల టెక్స్ట్ బాక్స్
-user_input_text = st.text_area(
-    "Original Source Content", 
-    value=st.session_state.main_text, 
+
+# ==========================================
+# 6. బాక్స్ 2: అనువాద ఫలితం (Final Translated Script)
+# ==========================================
+st.markdown("##### ✨ గౌరవప్రదమైన స్పీచ్ & అనువాద స్క్రిప్ట్ (Final Translated Script)")
+trans_area = st.text_area(
+    "Translated Content", 
+    value=st.session_state.translated_text if st.session_state.translated_text else st.session_state.main_text, 
     height=130,
-    placeholder="ఆడియో/మైక్ నుంచి వచ్చిన లేదా కాపీ చేసిన మూల వచనం ఇక్కడ కనిపిస్తుంది...",
     label_visibility="collapsed"
 )
-if user_input_text != st.session_state.main_text:
-    st.session_state.main_text = user_input_text
-
-# అనువాదం జరిగిన తర్వాత కనిపించే రెండవ బాక్స్
-if st.session_state.translated_text:
-    st.markdown("##### ✨ గౌరవప్రదమైన స్పీచ్ & అనువాద స్క్రిప్ట్ (Final Translated Script)")
-    trans_area = st.text_area(
-        "Translated Content", 
-        value=st.session_state.translated_text, 
-        height=140,
-        label_visibility="collapsed"
-    )
-    if trans_area != st.session_state.translated_text:
-        st.session_state.translated_text = trans_area
+if trans_area != st.session_state.translated_text:
+    st.session_state.translated_text = trans_area
 
 # ఆడియో & పోస్టర్ కోసం యాక్టివ్ టెక్స్ట్ నిర్ణయం
 active_text = st.session_state.translated_text.strip() if st.session_state.translated_text.strip() else st.session_state.main_text.strip()
 
 
 # ==========================================
-# 5. TTS సెట్టింగ్స్
+# 7. TTS సెట్టింగ్స్
 # ==========================================
 with st.expander("⚙️ TTS SETTINGS (స్వరం, స్పీడ్ & BGM)", expanded=True):
     col_tts_lang, col_tts_voice = st.columns([0.45, 0.55])
@@ -268,7 +277,7 @@ with st.expander("⚙️ TTS SETTINGS (స్వరం, స్పీడ్ & BGM
 
 
 # ==========================================
-# 6. ప్రధాన యాక్షన్ కంట్రోల్స్
+# 8. ప్రధాన యాక్షన్ కంట్రోల్స్
 # ==========================================
 b1, b2, b3, b4 = st.columns(4)
 b5, b6, b7 = st.columns(3)
@@ -337,7 +346,7 @@ with b7:
 
 
 # ==========================================
-# 7. AI పోస్టర్ ప్రివ్యూ విభాగం
+# 9. AI పోస్టర్ ప్రివ్యూ విభాగం
 # ==========================================
 if st.session_state.poster_html_data is not None:
     st.divider()
@@ -346,7 +355,7 @@ if st.session_state.poster_html_data is not None:
 
 
 # ==========================================
-# 8. TTS ఆడియో జనరేషన్
+# 10. TTS ఆడియో జనరేషన్
 # ==========================================
 if convert_btn:
     if active_text:
