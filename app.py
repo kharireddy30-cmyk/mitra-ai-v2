@@ -13,7 +13,7 @@ from datetime import datetime
 import docx
 from streamlit_mic_recorder import speech_to_text
 from services.groq_polisher import polish_speech_script
-from services.studio_designer import render_live_studio_poster
+from services.divine_canvas_pro import render_divine_canvas_pro
 
 # ==========================================
 # 1. పేజీ సెట్టింగ్స్ & UI స్టైల్స్
@@ -49,7 +49,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.subheader("🕉️ BRAHMA AI : Studio (Voiceover & Smart Poster)")
+st.subheader("🕉️ BRAHMA AI : Divine Studio Pro (Voice & Canvas)")
 
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
@@ -62,7 +62,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Layout & Poster Engine Online.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Divine Canvas Pro & Engine Online.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -217,7 +217,7 @@ def create_printable_pdf_html(text):
 # ==========================================
 # 3. AI కంట్రోల్స్ & మ్యాన్యువల్ లేఅవుట్ సెట్టింగ్స్
 # ==========================================
-with st.expander("⚙️ AI CONTROLS, STICKERS & POSTER LAYOUT", expanded=False):
+with st.expander("⚙️ AI CONTROLS, STICKERS & CANVAS SETTINGS", expanded=False):
     col_style, col_pause = st.columns(2)
     with col_style:
         selected_style = st.selectbox("🎭 స్పీచ్ స్టైల్:", options=["📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)", "🧘 ఆధ్యాత్మికం (Spiritual & Calm)", "📰 న్యూస్ రీడర్ (News Bulletin)", "🗣️ సంభాషణ / కబుర్లు (Conversational)"])
@@ -253,7 +253,6 @@ with st.expander("⚙️ AI CONTROLS, STICKERS & POSTER LAYOUT", expanded=False)
 
     col_bg_up, col_stk_up = st.columns(2)
     with col_bg_up:
-        # యానిమేటెడ్ GIF ఫైల్స్ సపోర్ట్‌తో కూడిన అప్‌లోడర్
         custom_bg_file = st.file_uploader("🖼️ కస్టమ్ బ్యాక్‌గ్రౌండ్ ఇమేజ్ / యానిమేటెడ్ GIF:", type=["png", "jpg", "jpeg", "webp", "gif"], key="cust_bg_up")
     with col_stk_up:
         custom_sticker_file = st.file_uploader("🏷️ కస్టమ్ లోగో/స్టిక్కర్ అప్‌లోడ్ (GIF/PNG):", type=["png", "jpg", "jpeg", "webp", "gif"], key="cust_sticker_up")
@@ -392,9 +391,9 @@ with b1:
 
 with b2:
     if active_text:
-        if st.button("🖼️ AI POSTER", use_container_width=True):
-            with st.spinner("లైవ్ స్టూడియో సిద్ధమవుతోంది..."):
-                poster_html = render_live_studio_poster(
+        if st.button("🖼️ DIVINE CANVAS", use_container_width=True):
+            with st.spinner("డివైన్ కాన్వాస్ ప్రో సిద్ధమవుతోంది..."):
+                poster_html = render_divine_canvas_pro(
                     active_text, 
                     theme=poster_theme, 
                     sticker_choice=sticker_choice, 
@@ -406,10 +405,10 @@ with b2:
                     user_prompt=custom_ai_note
                 )
                 st.session_state.poster_html_data = poster_html
-                add_log("పోస్టర్ సిద్ధమైంది!", "#4ade80")
-                st.toast("🖼️ పోస్టర్ సిద్ధమైంది!", icon="🖼️")
+                add_log("డివైన్ కాన్వాస్ ప్రో సిద్ధమైంది!", "#4ade80")
+                st.toast("🖼️ కాన్వాస్ సిద్ధమైంది!", icon="🖼️")
     else:
-        st.button("🖼️ AI POSTER", disabled=True, use_container_width=True)
+        st.button("🖼️ DIVINE CANVAS", disabled=True, use_container_width=True)
 
 with b3:
     if active_text:
@@ -453,12 +452,12 @@ with b7:
 
 
 # ==========================================
-# 8. AI పోస్టర్ ప్రివ్యూ విభాగం
+# 8. DIVINE CANVAS PRO ప్రివ్యూ విభాగం
 # ==========================================
 if st.session_state.poster_html_data is not None:
     st.divider()
-    st.markdown("### 🖼️ లైవ్ పోస్టర్ & GIF స్టూడియో (Live Smart Poster)")
-    st.components.v1.html(st.session_state.poster_html_data, height=960, scrolling=True)
+    st.markdown("### 🖼️ డివైన్ కాన్వాస్ ప్రో (Divine Spiritual Canvas Pro)")
+    st.components.v1.html(st.session_state.poster_html_data, height=980, scrolling=True)
 
 
 # ==========================================
