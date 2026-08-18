@@ -1,25 +1,18 @@
 import streamlit as st
-import edge_tts
-from pydub import AudioSegment
-from pydub.effects import normalize, compress_dynamic_range, high_pass_filter, low_pass_filter
-import speech_recognition as sr
-import asyncio
 import io
-import re
-import os
 import gc
-import traceback
 from datetime import datetime
 import docx
 from streamlit_mic_recorder import speech_to_text
-from services.groq_polisher import polish_speech_script
+from services.audio_engine import transcribe_audio_file, synthesize_multilang_tts
+from services.groq_polisher import polish_and_translate_script
 from services.image_poster import generate_ai_poster_html
 
 # ==========================================
-# 1. పేజీ సెట్టింగ్స్ & UI స్టైల్స్
+# 1. పేజీ సెట్టింగ్స్ & స్టైల్స్
 # ==========================================
 st.set_page_config(
-    page_title="BRAHMA AI", 
+    page_title="BRAHMA AI Studio", 
     layout="wide", 
     page_icon="🕉️",
     initial_sidebar_state="collapsed"
@@ -42,14 +35,14 @@ st.markdown("""
         padding: 8px;
         font-family: 'Courier New', monospace;
         font-size: 11px;
-        height: 100px;
+        height: 90px;
         overflow-y: auto;
     }
     .diag-log { margin-bottom: 2px; }
 </style>
 """, unsafe_allow_html=True)
 
-st.subheader("🕉️ BRAHMA AI : Studio (Voiceover & Smart Poster)")
+st.subheader("🕉️ BRAHMA AI : Studio (Multilingual Voice & Poster)")
 
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
@@ -62,131 +55,12 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Layout & Poster Engine Online.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Contextual Translation & Voice Engine Online.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
     t_str = datetime.now().strftime("%H:%M:%S")
     st.session_state.diag_logs.append({"time": t_str, "msg": msg, "color": color})
-
-
-# ==========================================
-# 2. కోర్ DSP, STT & డాక్యుమెంట్ ఇంజిన్
-# ==========================================
-
-def detect_chunk_language(text):
-    te_count = len(re.findall(r'[\u0C00-\u0C7F]', text))
-    hi_count = len(re.findall(r'[\u0900-\u097F]', text))
-    en_count = len(re.findall(r'[a-zA-Z]', text))
-
-    if te_count > hi_count and te_count > en_count:
-        return "te"
-    elif hi_count > te_count and hi_count > en_count:
-        return "hi"
-    elif en_count > 0:
-        return "en"
-    return "te"
-
-def apply_audio_dsp(audio_segment: AudioSegment) -> AudioSegment:
-    try:
-        processed = high_pass_filter(audio_segment, cutoff=300)
-        processed = low_pass_filter(processed, cutoff=3800)
-        processed = compress_dynamic_range(processed, threshold=-20.0, ratio=4.0, attack=5.0, release=50.0)
-        processed = normalize(processed) + 6.0
-        return processed
-    except Exception:
-        return audio_segment
-
-def transcribe_audio_file(uploaded_audio_file, lang_code="auto", enable_dsp=True, style="📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)", pause="మధ్యస్థం (Normal Pauses)", custom_note=""):
-    uploaded_audio_file.seek(0)
-    file_ext = os.path.splitext(uploaded_audio_file.name)[1].lower()
-    if not file_ext:
-        file_ext = ".m4a"
-        
-    temp_in = f"temp_stt_in{file_ext}"
-    with open(temp_in, "wb") as f:
-        f.write(uploaded_audio_file.read())
-
-    full_transcript = []
-    recognizer = sr.Recognizer()
-    target_langs = ["te-IN", "hi-IN", "en-IN"] if lang_code == "auto" else [lang_code]
-
-    try:
-        sound = AudioSegment.from_file(temp_in)
-        if enable_dsp:
-            sound = apply_audio_dsp(sound)
-        
-        sound = sound.set_channels(1).set_frame_rate(16000)
-        chunk_length_ms = 45 * 1000
-        total_len = len(sound)
-        
-        for i in range(0, total_len, chunk_length_ms):
-            chunk_audio = sound[i:i + chunk_length_ms]
-            temp_chunk_wav = f"temp_chunk_{i}.wav"
-            chunk_audio.export(temp_chunk_wav, format="wav")
-            
-            for test_lang in target_langs:
-                try:
-                    with sr.AudioFile(temp_chunk_wav) as source:
-                        audio_data = recognizer.record(source)
-                        part_text = recognizer.recognize_google(audio_data, language=test_lang)
-                        if part_text and part_text.strip():
-                            full_transcript.append(part_text.strip())
-                            break
-                except Exception:
-                    continue
-            
-            if os.path.exists(temp_chunk_wav):
-                try:
-                    os.remove(temp_chunk_wav)
-                except Exception:
-                    pass
-
-        if full_transcript:
-            raw_text = " ".join(full_transcript)
-            polished_text = polish_speech_script(raw_text, style_mode=style, pause_level=pause, user_instruction=custom_note)
-            return polished_text
-        else:
-            return "⚠️ Voice not recognized. Try selecting a specific language."
-
-    except Exception as e:
-        return f"⚠️ STT Error: {e}"
-    finally:
-        if os.path.exists(temp_in):
-            try:
-                os.remove(temp_in)
-            except Exception:
-                pass
-
-async def generate_voice_file(text, voice, pitch_val, rate_val, output_filename):
-    communicate = edge_tts.Communicate(text, voice, pitch=pitch_val, rate=rate_val)
-    await communicate.save(output_filename)
-
-def split_text_into_chunks(text, max_chars=200):
-    clean_text = re.sub(r'[\r]+', '', text).strip()
-    if not clean_text:
-        return []
-    raw_sentences = re.split(r'(?<=[.!?\n।])\s+|(?<=\.\.\.)\s+', clean_text)
-    chunks = []
-    for sentence in raw_sentences:
-        s_clean = sentence.strip()
-        if not s_clean:
-            continue
-        if len(s_clean) <= max_chars:
-            chunks.append(s_clean)
-        else:
-            words = s_clean.split(' ')
-            curr_chunk = ""
-            for word in words:
-                if len(curr_chunk) + len(word) + 1 <= max_chars:
-                    curr_chunk += word + " "
-                else:
-                    if curr_chunk.strip():
-                        chunks.append(curr_chunk.strip())
-                    curr_chunk = word + " "
-            if curr_chunk.strip():
-                chunks.append(curr_chunk.strip())
-    return [c.strip() for c in chunks if len(c.strip()) > 0]
 
 def extract_text_from_file(uploaded_file):
     extracted = ""
@@ -215,10 +89,17 @@ def create_printable_pdf_html(text):
 
 
 # ==========================================
-# 3. AI కంట్రోల్స్ & మ్యాన్యువల్ లేఅవుట్ సెట్టింగ్స్
+# 2. AI కంట్రోల్స్ & అనువాదం (Translation Controls)
 # ==========================================
-with st.expander("⚙️ AI CONTROLS, STICKERS & POSTER LAYOUT", expanded=False):
-    col_style, col_pause = st.columns(2)
+with st.expander("⚙️ AI CONTROLS (భాష మార్పు / అనువాదం, స్టైల్ & పోస్టర్)", expanded=False):
+    col_tr, col_style, col_pause = st.columns(3)
+    with col_tr:
+        target_trans_lang = st.selectbox(
+            "🌐 కావలసిన భాష (Translate Target):",
+            options=["అసలు భాష (Original)", "తెలుగు (Telugu)", "హిందీ (Hindi)", "ఇంగ్లీష్ (English)"],
+            index=0,
+            help="హిందీ లేదా ఇంగ్లీష్ ఆడియో ఉన్నా భావయుక్తమైన తెలుగులోకి అనువదిస్తుంది."
+        )
     with col_style:
         selected_style = st.selectbox("🎭 స్పీచ్ స్టైల్:", options=["📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)", "🧘 ఆధ్యాత్మికం (Spiritual & Calm)", "📰 న్యూస్ రీడర్ (News Bulletin)", "🗣️ సంభాషణ / కబుర్లు (Conversational)"])
     with col_pause:
@@ -230,19 +111,9 @@ with st.expander("⚙️ AI CONTROLS, STICKERS & POSTER LAYOUT", expanded=False)
     with col_stk:
         sticker_choice = st.selectbox(
             "🏷️ AI స్టిక్కర్స్ / బ్యాడ్జ్ ఎంపిక:",
-            options=[
-                "🪄 AI మ్యాజిక్ (Auto Select)",
-                "🕉️ ఓం (Divine Om)",
-                "🪷 పద్మం (Sacred Lotus)",
-                "🩸 రక్తదానం (Blood Drop)",
-                "🕊️ శాంతి కపోతం (Peace Dove)",
-                "🌟 గోల్డెన్ స్టార్ (Golden Star)",
-                "📜 రాయల్ సీల్ (Royal Seal)",
-                "❤️ సేవా హస్తం (Loving Care)"
-            ]
+            options=["🪄 AI మ్యాజిక్ (Auto Select)", "🕉️ ఓం (Divine Om)", "🪷 పద్మం (Sacred Lotus)", "🩸 రక్తదానం (Blood Drop)", "🕊️ శాంతి కపోతం (Peace Dove)", "🌟 గోల్డెన్ స్టార్ (Golden Star)", "📜 రాయల్ సీల్ (Royal Seal)", "❤️ సేవా హస్తం (Loving Care)"]
         )
 
-    # మ్యాన్యువల్ పోస్టర్ లేఅవుట్ ఆప్షన్లు
     col_mode, col_align, col_fsize = st.columns(3)
     with col_mode:
         content_mode = st.selectbox("📝 కంటెంట్ మోడ్:", options=["📜 పూర్తి మ్యాటర్ (Full Exact Text)", "🤖 AI సారాంశం (Summary Points)"])
@@ -252,11 +123,11 @@ with st.expander("⚙️ AI CONTROLS, STICKERS & POSTER LAYOUT", expanded=False)
         font_size_choice = st.selectbox("🔤 అక్షరాల సైజు (Font Size):", options=["మధ్యస్థం (Medium - 18px)", "చిన్నది (Small - 15px)", "పెద్దది (Large - 22px)", "చాలా పెద్దది (X-Large - 26px)"])
 
     custom_sticker_file = st.file_uploader("🖼️ కస్టమ్ లోగో/స్టిక్కర్ అప్‌లోడ్:", type=["png", "jpg", "jpeg", "webp"], key="cust_sticker_up")
-    custom_ai_note = st.text_input("💡 AIకి ప్రత్యేక ఆదేశం (Optional):", placeholder="ఉదా: తేదీలు, ముఖ్యమైన పిలుపుల వద్ద పాజ్ ఇవ్వాలి...")
+    custom_ai_note = st.text_input("💡 AIకి ప్రత్యేక ఆదేశం (Optional):", placeholder="ఉదా: భావాన్ని మార్చకుండా సరళమైన గ్రామీణ తెలుగులో అనువదించాలి...")
 
 
 # ==========================================
-# 4. ఇన్‌పుట్ విభాగాలు (DOC | AUDIO | MIC)
+# 3. ఇన్‌పుట్ విభాగాలు (DOC | AUDIO | MIC)
 # ==========================================
 with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
     c_file, c_audio_stt, c_mic = st.columns([0.33, 0.34, 0.33])
@@ -268,8 +139,8 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             try:
                 f_text = extract_text_from_file(uploaded_file)
                 if f_text and f_text != st.session_state.main_text:
-                    with st.spinner("AI Speech Formatting..."):
-                        polished = polish_speech_script(f_text, selected_style, selected_pause, custom_ai_note)
+                    with st.spinner("AI Processing & Translation..."):
+                        polished = polish_and_translate_script(f_text, target_trans_lang, selected_style, selected_pause, custom_ai_note)
                         st.session_state.main_text = polished if polished else f_text
                     add_log(f"DOC Loaded: {uploaded_file.name}", "#4ade80")
                     st.toast(f"✅ {uploaded_file.name} Loaded!")
@@ -278,7 +149,7 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
 
     with c_audio_stt:
         st.markdown("**🎵 AUDIO STT (Multi-min)**")
-        stt_lang_choice = st.selectbox("Audio Lang:", options=["🔄 Auto (Multi-Lang)", "HI (हिंदी)", "TE (తెలుగు)", "EN (English)"], key="stt_lang_choice", label_visibility="collapsed")
+        stt_lang_choice = st.selectbox("Audio Input Lang:", options=["🔄 Auto (Multi-Lang)", "HI (हिंदी)", "TE (తెలుగు)", "EN (English)"], key="stt_lang_choice", label_visibility="collapsed")
         stt_lang_map = {"🔄 Auto (Multi-Lang)": "auto", "TE (తెలుగు)": "te-IN", "HI (हिंदी)": "hi-IN", "EN (English)": "en-IN"}
         selected_stt_lang = stt_lang_map[stt_lang_choice]
 
@@ -288,15 +159,16 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             use_dsp = st.checkbox("✨ DSP Booster", value=True, key="stt_dsp_chk")
             if st.button("🚀 RUN STT", use_container_width=True):
                 add_log(f"STT Started: {uploaded_audio.name} ({stt_lang_choice})", "#c084fc")
-                with st.spinner("Transcribing & Formatting with AI..."):
-                    transcribed_txt = transcribe_audio_file(uploaded_audio, lang_code=selected_stt_lang, enable_dsp=use_dsp, style=selected_style, pause=selected_pause, custom_note=custom_ai_note)
-                    if transcribed_txt and not transcribed_txt.startswith("⚠️"):
-                        st.session_state.main_text = transcribed_txt.strip()
-                        add_log(f"STT Ready ({len(transcribed_txt)} chars)", "#4ade80")
+                with st.spinner("Transcribing & Expressive Translation..."):
+                    raw_txt = transcribe_audio_file(uploaded_audio, lang_code=selected_stt_lang, enable_dsp=use_dsp)
+                    if raw_txt and not raw_txt.startswith("⚠️"):
+                        final_script = polish_and_translate_script(raw_txt, target_trans_lang, selected_style, selected_pause, custom_ai_note)
+                        st.session_state.main_text = final_script.strip()
+                        add_log(f"STT & Translation Ready ({len(final_script)} chars)", "#4ade80")
                         st.toast("✅ స్క్రిప్ట్ సిద్ధమైంది!")
                         st.rerun()
                     else:
-                        st.error(transcribed_txt)
+                        st.error(raw_txt)
 
     with c_mic:
         st.markdown("**🎙️ LIVE MIC**")
@@ -310,8 +182,8 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             key='mic_rec'
         )
         if spoken_result and spoken_result != st.session_state.last_mic_text:
-            with st.spinner("Formatting Voice with AI..."):
-                polished_live = polish_speech_script(spoken_result, selected_style, selected_pause, custom_ai_note)
+            with st.spinner("Translating & Formatting Voice..."):
+                polished_live = polish_and_translate_script(spoken_result, target_trans_lang, selected_style, selected_pause, custom_ai_note)
                 st.session_state.main_text = (st.session_state.main_text + "\n\n" + (polished_live if polished_live else spoken_result)).strip()
             st.session_state.last_mic_text = spoken_result
             add_log(f"MIC: '{spoken_result}' (Polished)", "#4ade80")
@@ -319,20 +191,20 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
 
 
 # ==========================================
-# 5. MAIN TEXT CONTENT & RE-POLISH BAR
+# 4. MAIN TEXT CONTENT & RE-POLISH / TRANSLATE BAR
 # ==========================================
 col_hdr, col_polish = st.columns([0.65, 0.35])
 with col_hdr:
-    st.markdown("##### 📝 స్పీచ్ స్క్రిప్ట్ ఎడిటర్ (Speech Script)")
+    st.markdown("##### 📝 స్పీచ్ & ట్రాన్స్‌లేషన్ ఎడిటర్ (Speech & Translation Editor)")
 with col_polish:
-    if st.button("✨ స్క్రిప్ట్ మార్చు (Re-Polish AI)", use_container_width=True):
+    if st.button("✨ అనువదించు / మార్చు (Translate AI)", use_container_width=True, help="ఎంచుకున్న భాష మరియు స్టైల్ ప్రకారం అనువదించి విరామాలు సరిచేస్తుంది"):
         if st.session_state.main_text.strip():
-            with st.spinner("AI ద్వారా స్క్రిప్ట్ సరిచేస్తోంది..."):
-                polished = polish_speech_script(st.session_state.main_text, selected_style, selected_pause, custom_ai_note)
+            with st.spinner("Groq AI ద్వారా అనువదించి సరిచేస్తోంది..."):
+                polished = polish_and_translate_script(st.session_state.main_text, target_trans_lang, selected_style, selected_pause, custom_ai_note)
                 if polished:
                     st.session_state.main_text = polished
-                    add_log("స్క్రిప్ట్ రీ-పాలిష్ చేయబడింది!", "#38bdf8")
-                    st.toast("✨ స్క్రిప్ట్ సిద్ధమైంది!", icon="✨")
+                    add_log(f"విజయవంతంగా అనువదించబడింది! -> {target_trans_lang}", "#38bdf8")
+                    st.toast(f"✨ స్క్రిప్ట్ సిద్ధమైంది! ({target_trans_lang})", icon="✨")
                     st.rerun()
         else:
             st.warning("దయచేసి టెక్స్ట్‌ను ఎంటర్ చేయండి.")
@@ -341,7 +213,7 @@ user_input_text = st.text_area(
     "Content Editor", 
     value=st.session_state.main_text, 
     height=160,
-    placeholder="Formatted speech script appears here...",
+    placeholder="Transcribed and translated speech script appears here...",
     label_visibility="collapsed"
 )
 if user_input_text != st.session_state.main_text:
@@ -349,7 +221,7 @@ if user_input_text != st.session_state.main_text:
 
 
 # ==========================================
-# 6. TTS SETTINGS
+# 5. TTS SETTINGS
 # ==========================================
 with st.expander("⚙️ TTS SETTINGS (స్వరం, స్పీడ్ & BGM)", expanded=True):
     col_tts_lang, col_tts_voice = st.columns([0.45, 0.55])
@@ -374,20 +246,19 @@ with st.expander("⚙️ TTS SETTINGS (స్వరం, స్పీడ్ & BGM
 
 
 # ==========================================
-# 7. యాక్షన్ కంట్రోల్స్
+# 6. ప్రధాన యాక్షన్ కంట్రోల్స్
 # ==========================================
 active_text = st.session_state.main_text.strip()
 b1, b2, b3, b4 = st.columns(4)
 b5, b6, b7 = st.columns(3)
 
-# Row 1
 with b1:
     convert_btn = st.button("🔊 TTS", type="primary", use_container_width=True)
 
 with b2:
     if active_text:
         if st.button("🖼️ AI POSTER", use_container_width=True):
-            with st.spinner("పోస్టర్ లేఅవుట్ సిద్ధమవుతోంది..."):
+            with st.spinner("పోస్టర్ సిద్ధమవుతోంది..."):
                 poster_html = generate_ai_poster_html(
                     active_text, 
                     theme=poster_theme, 
@@ -417,7 +288,6 @@ with b4:
     else:
         st.button("📄 PDF", disabled=True, use_container_width=True)
 
-# Row 2
 with b5:
     if active_text:
         docx_data = create_docx_bytes(active_text)
@@ -445,7 +315,7 @@ with b7:
 
 
 # ==========================================
-# 8. AI పోస్టర్ ప్రివ్యూ విభాగం
+# 7. AI పోస్టర్ ప్రివ్యూ విభాగం
 # ==========================================
 if st.session_state.poster_html_data is not None:
     st.divider()
@@ -454,77 +324,30 @@ if st.session_state.poster_html_data is not None:
 
 
 # ==========================================
-# 9. ఆటో మల్టీ-లాంగ్వేజ్ TTS జనరేషన్ ఇంజిన్
+# 8. TTS ఆడియో జనరేషన్
 # ==========================================
 if convert_btn:
     if active_text:
         add_log(f"TTS Started: Mode={tts_lang}", "#c084fc")
         with st.spinner("Generating Natural Voice..."):
-            try:
-                clean_txt = re.sub(r'[*#_~`]', '', active_text)
-                rate_str = f"{int((audio_speed - 1.0) * 100):+d}%"
-                pitch_val_map = {"Normal": "+0Hz", "Deep Base": "-5Hz", "Heavy Base": "-10Hz"}
-                pitch_str = pitch_val_map[pitch_custom]
-
-                voice_dict = {
-                    "te": "te-IN-MohanNeural" if "Male" in gender_choice else "te-IN-ShrutiNeural",
-                    "hi": "hi-IN-MadhurNeural" if "Male" in gender_choice else "hi-IN-SwaraNeural",
-                    "en": "en-IN-PrabhatNeural" if "Male" in gender_choice else "en-IN-NeerjaNeural"
-                }
-
-                text_chunks = split_text_into_chunks(clean_txt, max_chars=200)
-                speech_sound = AudioSegment.empty()
-                silence_pause = AudioSegment.silent(duration=int(pause_duration * 1000))
-
-                for i, chunk in enumerate(text_chunks):
-                    if "Auto" in tts_lang:
-                        detected_l = detect_chunk_language(chunk)
-                        chosen_voice = voice_dict[detected_l]
-                    elif "Telugu" in tts_lang:
-                        chosen_voice = voice_dict["te"]
-                    elif "Hindi" in tts_lang:
-                        chosen_voice = voice_dict["hi"]
-                    else:
-                        chosen_voice = voice_dict["en"]
-
-                    temp_file = f"temp_tts_{i}.mp3"
-                    try:
-                        asyncio.run(generate_voice_file(chunk, chosen_voice, pitch_str, rate_str, temp_file))
-                        if os.path.exists(temp_file) and os.path.getsize(temp_file) > 0:
-                            chunk_sound = AudioSegment.from_file(temp_file)
-                            speech_sound += chunk_sound + silence_pause
-                            os.remove(temp_file)
-                    except Exception as ce:
-                        add_log(f"Chunk {i} note: {ce}", "#facc15")
-
-                if len(speech_sound) > 0:
-                    final_sound = speech_sound
-                    if enable_bgm and os.path.exists("bgm.mp3"):
-                        try:
-                            bgm_sound = AudioSegment.from_file("bgm.mp3")
-                            if len(bgm_sound) < len(speech_sound):
-                                bgm_sound = bgm_sound * ((len(speech_sound) // len(bgm_sound)) + 1)
-                            bgm_sound = bgm_sound[:len(speech_sound) + 1000]
-                            reduction_db = 22 - (bgm_volume * 1.5)
-                            bgm_sound = bgm_sound - reduction_db
-                            final_sound = speech_sound.overlay(bgm_sound)
-                        except Exception:
-                            pass
-
-                    final_fp = io.BytesIO()
-                    final_sound.export(final_fp, format="mp3")
-                    st.session_state.audio_bytes_data = final_fp.getvalue()
-                    add_log("TTS Audio Ready!", "#4ade80")
-                    gc.collect()
-                    st.toast("🎉 TTS Audio Ready!")
-                else:
-                    add_log("TTS Failed", "#f87171")
-                    st.error("❌ Audio Generation Failed.")
-
-            except Exception as e:
-                add_log(f"TTS Error: {e}", "#f87171")
-                st.error("❌ TTS Error:")
-                st.code(traceback.format_exc())
+            audio_bytes = synthesize_multilang_tts(
+                text=active_text,
+                tts_mode=tts_lang,
+                gender=gender_choice,
+                speed=audio_speed,
+                pitch_custom=pitch_custom,
+                pause_sec=pause_duration,
+                enable_bgm=enable_bgm,
+                bgm_vol=bgm_volume
+            )
+            if audio_bytes:
+                st.session_state.audio_bytes_data = audio_bytes
+                add_log("TTS Audio Ready!", "#4ade80")
+                gc.collect()
+                st.toast("🎉 TTS Audio Ready!")
+            else:
+                add_log("TTS Failed", "#f87171")
+                st.error("❌ Audio Generation Failed.")
     else:
         st.warning("Please provide text.")
 
