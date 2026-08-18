@@ -18,7 +18,7 @@ def get_sticker_symbol(sticker_choice, text=""):
         clean_t = text.lower()
         if any(k in clean_t for k in ["రక్తం", "రక్తదాన", "సేవ", "ఆసుపత్రి", "బ్లడ్", "శిబిరం"]):
             return "🩸"
-        elif any(k in clean_t for k in ["ఓం", "శాంతి", "ధ్యానం", "భగవాన్", "ఆత్మ", "ఆధ్యాత్మిక", "శివ"]):
+        elif any(k in clean_t for k in ["ఓం", "శాంతి", "ధ్యానం", "భగవాన్", "ఆత్మ", "ఆధ్యాత్మిక", "శివ", "బాబా"]):
             return "🕉️"
         elif any(k in clean_t for k in ["శాంతి", "ప్రశాంతత", "ప్రేమ"]):
             return "🕊️"
@@ -38,10 +38,12 @@ def get_groq_ai_design_suggestions(text, user_prompt=""):
         "highlight": "",
         "textColor": "#5c0606",
         "bgShade": "transparent",
-        "fontSize": 17,
+        "fontSize": 18,
         "lineHeight": 1.6,
-        "topOffset": 135,
-        "auraEnabled": "block"
+        "topOffset": 230,
+        "leftOffset": 0,
+        "auraPos": "top",
+        "fontFamily": "'Mandali', sans-serif"
     }
     
     if not groq_key or not text or not text.strip():
@@ -55,10 +57,12 @@ Return a STRICTLY VALID JSON object with these keys:
   "highlight": "The single most impactful sentence or slogan from the text to highlight (max 8 words)",
   "textColor": "One hex code: #5c0606 (Maroon), #0f172a (Black), #ffffff (White), #facc15 (Gold), #1e3a8a (Navy Blue)",
   "bgShade": "One CSS value: transparent, rgba(255,255,255,0.45), rgba(0,0,0,0.45)",
-  "fontSize": 17,
+  "fontSize": 18,
   "lineHeight": 1.6,
-  "topOffset": 135,
-  "auraEnabled": "block or none"
+  "topOffset": 230,
+  "leftOffset": 0,
+  "auraPos": "top or center or bottom or none",
+  "fontFamily": "'Mandali', sans-serif"
 }
 STRICT JSON ONLY. No markdown wrapper, no conversational explanation."""
 
@@ -128,18 +132,18 @@ def render_live_studio_poster(
 
     font_size_map = {
         "చిన్నది (Small - 15px)": 15,
-        "మధ్యస్థం (Medium - 18px)": 17,
-        "పెద్దది (Large - 22px)": 20,
-        "చాలా పెద్దది (X-Large - 26px)": 24
+        "మధ్యస్థం (Medium - 18px)": 18,
+        "పెద్దది (Large - 22px)": 21,
+        "చాలా పెద్దది (X-Large - 26px)": 25
     }
-    selected_font_size = font_size_map.get(font_size_choice, ai_cfg.get("fontSize", 17))
+    selected_font_size = font_size_map.get(font_size_choice, ai_cfg.get("fontSize", 18))
 
     align_map = {
         "ఎడమ వైపు (Left)": "left",
         "మధ్యలో (Center)": "center",
         "సమానంగా (Justify)": "justify"
     }
-    selected_align = align_map.get(text_align, "left")
+    selected_align = align_map.get(text_align, "center")
 
     custom_img_html = ""
     if custom_sticker_file is not None:
@@ -157,55 +161,43 @@ def render_live_studio_poster(
     paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
     body_content_html = "".join([f"<p class='content-p'>{p}</p>" for p in paragraphs])
 
-    init_top = 135 if has_custom_bg else 10
+    init_top = 230 if has_custom_bg else 10
+    init_left = 0
     init_color = "#5c0606" if has_custom_bg else "#ffffff"
     init_bg = ai_cfg.get("bgShade", "transparent")
     init_line_h = ai_cfg.get("lineHeight", 1.6)
     init_hl = ai_cfg.get("highlight", "")
     init_title = ai_cfg.get("title", "సందేశం / ముఖ్యాంశాలు")
-    init_aura = "block"
 
     html_code = f"""<!DOCTYPE html>
 <html lang="te">
 <head>
 <meta charset="utf-8">
-<title>BRAHMA AI Studio Pro - Split Layout</title>
+<title>BRAHMA AI Studio Pro - Ultimate Edition</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.3.2/gifshot.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Mandali&display=swap');
-  * {{ box-sizing: border-box; font-family: 'Mandali', sans-serif; }}
-  body {{ margin: 0; padding: 10px; background: #070a13; color: #fff; }}
+  @import url('https://fonts.googleapis.com/css2?family=Mandali&family=Suranna&family=Ramabhadra&display=swap');
+  * {{ box-sizing: border-box; }}
+  body {{ margin: 0; padding: 10px; background: #070a13; color: #fff; font-family: 'Mandali', sans-serif; user-select: none; }}
   
-  /* 3-Column Split Layout (Left Tools | Center Poster | Right Tools) */
   .studio-layout {{
-      display: flex;
-      flex-direction: row;
-      justify-content: center;
-      align-items: flex-start;
-      gap: 15px;
-      width: 100%;
-      max-width: 1280px;
-      margin: 0 auto;
+      display: flex; flex-direction: row; justify-content: center; align-items: flex-start;
+      gap: 15px; width: 100%; max-width: 1320px; margin: 0 auto;
   }}
 
   /* టూల్ ప్యానెల్స్ */
   .side-panel {{
-      flex: 1;
-      min-width: 250px;
-      max-width: 310px;
-      background: #111827;
-      border: 1px solid #374151;
-      border-radius: 14px;
-      padding: 14px 16px;
-      box-shadow: 0 8px 25px rgba(0,0,0,0.7);
+      flex: 1; min-width: 260px; max-width: 320px; background: #111827;
+      border: 1px solid #374151; border-radius: 14px; padding: 14px 16px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.75);
   }}
   .panel-header {{
       font-size: 13px; font-weight: bold; color: #facc15; text-align: center;
       margin-bottom: 12px; border-bottom: 1px solid #374151; padding-bottom: 6px;
   }}
   .tool-item {{
-      display: flex; flex-direction: column; margin-bottom: 11px;
+      display: flex; flex-direction: column; margin-bottom: 10px;
       font-size: 11px; font-weight: 600; color: #cbd5e1;
   }}
   .tool-item input, .tool-item select {{
@@ -214,14 +206,9 @@ def render_live_studio_poster(
   }}
   
   /* మధ్యలో పోస్టర్ కాన్వాస్ కార్డ్ */
-  .center-stage {{
-      flex: 1.4;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-  }}
+  .center-stage {{ flex: 1.4; display: flex; flex-direction: column; align-items: center; }}
   .poster-card {{
-      width: 100%; max-width: 520px; min-height: 720px; background: {bg_style};
+      width: 100%; max-width: 530px; min-height: 730px; background: {bg_style};
       border: 3.5px solid #facc15; border-radius: 18px; padding: 18px; color: #ffffff;
       box-shadow: 0 15px 40px rgba(0,0,0,0.95); position: relative; overflow: hidden;
       display: flex; flex-direction: column; justify-content: space-between;
@@ -230,7 +217,7 @@ def render_live_studio_poster(
   /* యానిమేషన్లు */
   @keyframes pulseRays {{
       0% {{ transform: translate(-50%, 0) scale(0.85); opacity: 0.35; filter: drop-shadow(0 0 10px #f59e0b); }}
-      50% {{ transform: translate(-50%, 0) scale(1.25); opacity: 0.90; filter: drop-shadow(0 0 32px #fbbf24); }}
+      50% {{ transform: translate(-50%, 0) scale(1.30); opacity: 0.95; filter: drop-shadow(0 0 35px #fbbf24); }}
       100% {{ transform: translate(-50%, 0) scale(0.85); opacity: 0.35; filter: drop-shadow(0 0 10px #f59e0b); }}
   }}
   @keyframes shimmerText {{
@@ -239,24 +226,33 @@ def render_live_studio_poster(
       100% {{ text-shadow: 0 0 4px rgba(250,204,21,0.3); }}
   }}
 
-  .divine-aura-bottom {{
-      position: absolute; bottom: 30px; left: 50%; width: 135px; height: 135px;
-      border-radius: 50%; background: radial-gradient(circle, rgba(251,191,36,0.85) 0%, rgba(245,158,11,0.45) 45%, transparent 70%);
+  /* డైనమిక్ ఆరా (టాప్, సెంటర్, బాటమ్) */
+  .divine-aura {{
+      position: absolute; left: 50%; width: 130px; height: 130px;
+      border-radius: 50%; background: radial-gradient(circle, rgba(251,191,36,0.9) 0%, rgba(245,158,11,0.5) 45%, transparent 70%);
       pointer-events: none; z-index: 1; animation: pulseRays 2.2s infinite ease-in-out;
   }}
+  .aura-top {{ top: 38px; }}
+  .aura-center {{ top: 50%; transform: translate(-50%, -50%); }}
+  .aura-bottom {{ bottom: 30px; }}
+
   .sparkle-decor {{ position: absolute; font-size: 20px; color: #fde047; pointer-events: none; }}
 
-  .header-box {{ text-align: center; margin-bottom: 6px; z-index: 2; {'display: none;' if has_custom_bg else ''} }}
+  .header-box {{ text-align: center; margin-bottom: 6px; z-index: 2; cursor: move; {'display: none;' if has_custom_bg else ''} }}
   .header-title {{ font-size: 22px; font-weight: bold; color: #facc15; animation: shimmerText 2.5s infinite; }}
   .sticker-badge {{ font-size: 36px; display: inline-block; filter: drop-shadow(0 0 8px #facc15); }}
   
+  /* డ్రాగబుల్ కంటెంట్ బాక్స్ */
   .content-canvas {{
       width: 88%; margin: 0 auto; padding: 10px;
-      transition: all 0.1s ease-in-out; position: relative; z-index: 2;
+      transition: width 0.1s, font-size 0.1s, line-height 0.1s, color 0.1s, background 0.1s;
+      position: relative; z-index: 2; cursor: move;
       font-size: {selected_font_size}px; line-height: {init_line_h}; color: {init_color};
       text-align: {selected_align};
       margin-top: {init_top}px;
+      transform: translateX({init_left}px);
       text-shadow: 0 1px 2px rgba(255,255,255,0.7);
+      font-family: 'Mandali', sans-serif;
   }}
   .content-p {{ margin-bottom: 8px; }}
 
@@ -264,14 +260,13 @@ def render_live_studio_poster(
       display: {'block' if init_hl else 'none'}; margin-top: 10px; padding: 7px 12px; text-align: center;
       background: linear-gradient(90deg, rgba(250,204,21,0.2), rgba(250,204,21,0.65), rgba(250,204,21,0.2));
       border: 1.5px solid #facc15; border-radius: 8px; font-weight: bold; font-size: 18px; color: #7f1d1d;
-      animation: shimmerText 2s infinite;
+      animation: shimmerText 2s infinite; cursor: move;
   }}
   
-  .footer-box {{ text-align: center; padding: 5px; z-index: 2; {'display: none;' if has_custom_bg else ''} }}
+  .footer-box {{ text-align: center; padding: 5px; z-index: 2; cursor: move; {'display: none;' if has_custom_bg else ''} }}
   .footer-quote {{ font-size: 15px; font-weight: bold; color: #fde047; margin: 0; }}
 
-  /* డౌన్‌లోడ్ బటన్లు */
-  .btn-stack {{ display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }}
+  .btn-stack {{ display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }}
   .btn-png {{ background: #facc15; color: #000; border: none; padding: 9px; border-radius: 7px; font-weight: bold; cursor: pointer; font-size: 13px; }}
   .btn-gif {{ background: #ec4899; color: #fff; border: none; padding: 9px; border-radius: 7px; font-weight: bold; cursor: pointer; font-size: 13px; }}
 
@@ -282,36 +277,49 @@ def render_live_studio_poster(
 
 <div class="studio-layout">
   
-  <!-- ఎడమ వైపు టూల్ ప్యానెల్ (Typography & Positioning) -->
+  <!-- ఎడమ వైపు ప్యానెల్ (Typography, Font & Align) -->
   <div class="side-panel">
-    <div class="panel-header">📐 లేఅవుట్ & టైపోగ్రఫీ (Left)</div>
+    <div class="panel-header">📐 లేఅవుట్, స్థానం & ఫాంట్స్ (Left)</div>
     
     <div class="tool-item">
-      <label>↕️ ఎత్తు (Top Offset):</label>
-      <input type="range" id="rngTop" min="0" max="350" value="{init_top}" oninput="updateLayout()">
+      <label>↕️ ఎత్తు (Top/Y Offset):</label>
+      <input type="range" id="rngTop" min="0" max="450" value="{init_top}" oninput="updateLayout()">
+    </div>
+
+    <div class="tool-item">
+      <label>↔️ అడ్డం (Left/X Offset):</label>
+      <input type="range" id="rngLeft" min="-150" max="150" value="{init_left}" oninput="updateLayout()">
     </div>
     
     <div class="tool-item">
       <label>↔️ బాక్స్ వెడల్పు (%):</label>
-      <input type="range" id="rngWidth" min="60" max="100" value="88" oninput="updateLayout()">
+      <input type="range" id="rngWidth" min="50" max="100" value="88" oninput="updateLayout()">
     </div>
     
     <div class="tool-item">
       <label>🔤 అక్షరాల సైజు (px):</label>
-      <input type="range" id="rngFontSize" min="13" max="26" value="{selected_font_size}" oninput="updateLayout()">
+      <input type="range" id="rngFontSize" min="12" max="30" value="{selected_font_size}" oninput="updateLayout()">
     </div>
     
     <div class="tool-item">
       <label>📏 వాక్యాల దూరం (Line Gap):</label>
-      <input type="range" id="rngLineHeight" min="1.2" max="2.2" step="0.1" value="{init_line_h}" oninput="updateLayout()">
+      <input type="range" id="rngLineHeight" min="1.1" max="2.4" step="0.1" value="{init_line_h}" oninput="updateLayout()">
     </div>
 
     <div class="tool-item">
-      <label>📐 టెక్స్ట్ అలైన్‌మెంట్:</label>
+      <label>🖋️ తెలుగు ఫాంట్ శైలి:</label>
+      <select id="selFont" onchange="updateLayout()">
+        <option value="'Mandali', sans-serif">మండలి (Mandali - Standard)</option>
+        <option value="'Suranna', serif">సూరన్న (Suranna - Traditional)</option>
+        <option value="'Ramabhadra', sans-serif">రామభద్ర (Ramabhadra - Bold)</option>
+      </select>
+    </div>
+
+    <div class="tool-item">
+      <label>📐 టెక్స్ట్ అమరిక (Alignment):</label>
       <select id="selAlign" onchange="updateLayout()">
-        <option value="{selected_align}">ప్రస్తుతం ({selected_align})</option>
-        <option value="left">ఎడమ వైపు (Left)</option>
         <option value="center">మధ్యలో (Center)</option>
+        <option value="left">ఎడమ వైపు (Left)</option>
         <option value="justify">సమానంగా (Justify)</option>
       </select>
     </div>
@@ -325,19 +333,21 @@ def render_live_studio_poster(
     </div>
   </div>
 
-  <!-- మధ్యలో పోస్టర్ కార్డ్ (Center Full Poster) -->
+  <!-- మధ్యలో పోస్టర్ కార్డ్ (Center Full Poster with Drag Support) -->
   <div class="center-stage">
     <div class="poster-card" id="posterCard">
       <div class="sparkle-decor" style="top: 20px; left: 25px;">✨</div>
       <div class="sparkle-decor" style="top: 30px; right: 30px;">🌟</div>
-      <div class="divine-aura-bottom" id="divineAura" style="display: {init_aura};"></div>
+      
+      <!-- జ్యోతి ఆరా లైట్ -->
+      <div class="divine-aura aura-top" id="divineAura"></div>
 
       <div class="header-box" id="headerBox">
         {top_sticker_display}
         <div class="header-title">{init_title}</div>
       </div>
 
-      <div class="content-canvas" id="contentBox">
+      <div class="content-canvas" id="contentBox" title="మౌస్ లేదా టచ్ తో పట్టుకుని ఎక్కడికైనా జరపవచ్చు">
         {body_content_html}
         <div class="special-highlight-card" id="specialHighlight">{'✨ ' + init_hl + ' ✨' if init_hl else ''}</div>
       </div>
@@ -348,9 +358,9 @@ def render_live_studio_poster(
     </div>
   </div>
 
-  <!-- కుడి వైపు టూల్ ప్యానెల్ (Colors, Effects & Downloads) -->
+  <!-- కుడి వైపు ప్యానెల్ (Colors, 3D Outline, Aura & Export) -->
   <div class="side-panel">
-    <div class="panel-header">🎨 రంగులు, ఆరా & ఎగుమతి (Right)</div>
+    <div class="panel-header">🎨 రంగులు, గ్లో & ఎగుమతి (Right)</div>
     
     <div class="tool-item">
       <label>🎨 టెక్స్ట్ రంగు:</label>
@@ -361,6 +371,17 @@ def render_live_studio_poster(
         <option value="#ffffff">ప్యూర్ వైట్ (White)</option>
         <option value="#facc15">గోల్డెన్ ఎల్లో (Gold)</option>
         <option value="#1e3a8a">రాయల్ బ్లూ (Blue)</option>
+        <option value="#7f1d1d">డీప్ రెడ్ (Deep Red)</option>
+      </select>
+    </div>
+
+    <div class="tool-item">
+      <label>✨ టెక్స్ట్ స్ట్రోక్ & 3D గ్లో:</label>
+      <select id="selStroke" onchange="updateLayout()">
+        <option value="none">సాధారణ షాడో (Normal Shadow)</option>
+        <option value="gold-glow">గోల్డెన్ గ్లో (Golden Glow)</option>
+        <option value="dark-outline">డార్క్ ఔట్‌లైన్ (Dark Bold Outline)</option>
+        <option value="white-glow">వైట్ డివైన్ గ్లో (Angelic White Glow)</option>
       </select>
     </div>
 
@@ -370,13 +391,16 @@ def render_live_studio_poster(
         <option value="transparent">పూర్తి పారదర్శకం (Clear)</option>
         <option value="rgba(255, 255, 255, 0.45)">లైట్ వైట్ గ్లాస్ (White Glass)</option>
         <option value="rgba(0, 0, 0, 0.45)">సాఫ్ట్ డార్క్ గ్లాస్ (Dark Glass)</option>
+        <option value="rgba(250, 204, 21, 0.2)">గోల్డెన్ గ్లాస్ (Gold Tint)</option>
       </select>
     </div>
 
     <div class="tool-item">
-      <label>🌟 దివ్య కిరణాల ఆరా (Rays):</label>
-      <select id="selAura" onchange="toggleAura()">
-        <option value="block">✨ ఆన్ (Shining Aura)</option>
+      <label>🌟 దివ్య జ్యోతి ఆరా (Light Position):</label>
+      <select id="selAuraPos" onchange="updateAura()">
+        <option value="top">✨ పైన జ్యోతి బిందువు (Top Light)</option>
+        <option value="center">🕊️ మధ్యలో అవ్యక్త ఆరా (Center Angelic)</option>
+        <option value="bottom">🕉️ కింద శివలింగం (Bottom Light)</option>
         <option value="none">ఆఫ్ (Off)</option>
       </select>
     </div>
@@ -408,27 +432,40 @@ def render_live_studio_poster(
 <script>
 function updateLayout() {{
     const topVal = document.getElementById("rngTop").value;
+    const leftVal = document.getElementById("rngLeft").value;
     const widthVal = document.getElementById("rngWidth").value;
     const fontVal = document.getElementById("rngFontSize").value;
     const lineHVal = document.getElementById("rngLineHeight").value;
     const colorVal = document.getElementById("selColor").value;
+    const strokeVal = document.getElementById("selStroke").value;
     const bgShadeVal = document.getElementById("selBgShade").value;
     const alignVal = document.getElementById("selAlign").value;
+    const fontFam = document.getElementById("selFont").value;
     
     const contentBox = document.getElementById("contentBox");
     contentBox.style.marginTop = topVal + "px";
+    contentBox.style.transform = `translateX(${{leftVal}}px)`;
     contentBox.style.width = widthVal + "%";
     contentBox.style.fontSize = fontVal + "px";
     contentBox.style.lineHeight = lineHVal;
     contentBox.style.color = colorVal;
     contentBox.style.background = bgShadeVal;
     contentBox.style.textAlign = alignVal;
+    contentBox.style.fontFamily = fontFam;
     contentBox.style.borderRadius = "10px";
     
-    if (colorVal === "#ffffff" || colorVal === "#facc15") {{
-        contentBox.style.textShadow = "0 2px 6px rgba(0,0,0,0.95)";
+    if (strokeVal === "gold-glow") {{
+        contentBox.style.textShadow = "0 0 10px #facc15, 0 0 20px #f59e0b, 0 1px 2px #000";
+    }} else if (strokeVal === "dark-outline") {{
+        contentBox.style.textShadow = "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 5px rgba(0,0,0,0.8)";
+    }} else if (strokeVal === "white-glow") {{
+        contentBox.style.textShadow = "0 0 8px rgba(255,255,255,0.9), 0 0 15px rgba(255,255,255,0.6)";
     }} else {{
-        contentBox.style.textShadow = "0 1px 2px rgba(255,255,255,0.7)";
+        if (colorVal === "#ffffff" || colorVal === "#facc15") {{
+            contentBox.style.textShadow = "0 2px 6px rgba(0,0,0,0.95)";
+        }} else {{
+            contentBox.style.textShadow = "0 1px 2px rgba(255,255,255,0.7)";
+        }}
     }}
 }}
 
@@ -452,11 +489,73 @@ function toggleHeader() {{
     document.getElementById("footerBox").style.display = val;
 }}
 
-function toggleAura() {{
-    const val = document.getElementById("selAura").value;
-    document.getElementById("divineAura").style.display = val;
+function updateAura() {{
+    const pos = document.getElementById("selAuraPos").value;
+    const aura = document.getElementById("divineAura");
+    if (pos === "none") {{
+        aura.style.display = "none";
+    }} else if (pos === "top") {{
+        aura.style.display = "block";
+        aura.className = "divine-aura aura-top";
+    }} else if (pos === "center") {{
+        aura.style.display = "block";
+        aura.className = "divine-aura aura-center";
+    }} else {{
+        aura.style.display = "block";
+        aura.className = "divine-aura aura-bottom";
+    }}
 }}
 
+// ===============================================
+// లైవ్ మౌస్ & టచ్ డ్రాగ్ అండ్ డ్రాప్ ఇంజిన్
+// ===============================================
+let isDragging = false;
+let startX, startY;
+const contentBox = document.getElementById("contentBox");
+
+function startDrag(e) {{
+    isDragging = true;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    startX = clientX;
+    startY = clientY;
+}}
+
+function doDrag(e) {{
+    if (!isDragging) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+    
+    let currentTop = parseInt(document.getElementById("rngTop").value) || 0;
+    let currentLeft = parseInt(document.getElementById("rngLeft").value) || 0;
+    
+    let newTop = Math.max(0, Math.min(450, currentTop + dy));
+    let newLeft = Math.max(-150, Math.min(150, currentLeft + dx));
+    
+    document.getElementById("rngTop").value = newTop;
+    document.getElementById("rngLeft").value = newLeft;
+    
+    startX = clientX;
+    startY = clientY;
+    
+    updateLayout();
+}}
+
+function stopDrag() {{
+    isDragging = false;
+}}
+
+contentBox.addEventListener("mousedown", startDrag);
+window.addEventListener("mousemove", doDrag);
+window.addEventListener("mouseup", stopDrag);
+
+contentBox.addEventListener("touchstart", startDrag, {{ passive: true }});
+window.addEventListener("touchmove", doDrag, {{ passive: true }});
+window.addEventListener("touchend", stopDrag);
+
+// ప్రారంభ అమరిక
 updateLayout();
 
 function saveAsImage() {{
