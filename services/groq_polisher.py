@@ -15,9 +15,9 @@ def polish_and_translate_script(
     if not groq_key:
         return "⚠️ Groq API Key Not Found! Please check secrets.toml"
 
-    # భాషా సూచనలు (Strict Language Rules)
+    # భాషా సూచనలు (Strict Language Directives)
     if "హిందీ" in target_lang:
-        instruction = "MANDATORY: Translate the entire content into pure, respectful HINDI in Devanagari script (हिन्दी). Do NOT use Telugu words. Example tone: 'आत्मिक भाई-बहनों को सादर ॐ शांति', 'रक्तदान महादान', 'आप सभी सादर आमंत्रित हैं'."
+        instruction = "MANDATORY: Translate the entire content into pure, respectful HINDI written in Devanagari script (हिन्दी). Do NOT output Telugu words. Example tone: 'आत्मिक भाई-बहनों को सादर ॐ शांति', 'रक्तदान महादान', 'आप सभी सादर आमंत्रित हैं'."
     elif "ఇంగ్లీష్" in target_lang or "English" in target_lang:
         instruction = "MANDATORY: Translate the entire content into dignified, inspiring, and fluent ENGLISH. Do NOT output Telugu words."
     elif "తెలుగు" in target_lang:
@@ -25,14 +25,14 @@ def polish_and_translate_script(
     else:
         instruction = "Keep the original language and polish speech pacing."
 
-    prompt_content = f"""You are a master translator and speech director.
+    prompt_content = f"""You are a master multilingual translator and speech director.
 TASK: {instruction}
 
 RULES:
-1. Output ONLY the translated speech text.
-2. Insert breathing pauses (...) and commas (,) naturally.
-3. Put dates, times, venues on separate lines.
-4. No intro, no explanations, no markdown tags.
+1. Output ONLY the translated speech text in the target language script.
+2. Insert breathing pauses (...) and commas (,) naturally where a speaker takes a breath.
+3. Put dates, times, venues, and key calls to action on separate lines.
+4. No introduction, no explanations, no markdown tags.
 
 TEXT TO TRANSLATE:
 {text}"""
@@ -44,9 +44,14 @@ TEXT TO TRANSLATE:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     }
     
-    # స్థిరమైన మరియు ఖచ్చితమైన మోడల్స్
-    models_to_try = ["llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+    # ప్రస్తుతం Groq లో 100% యాక్టివ్‌గా ఉన్న అధికారిక మోడల్స్
+    models_to_try = [
+        "llama-3.3-70b-specdec",
+        "llama-3.1-8b-instant",
+        "gemma2-9b-it"
+    ]
 
+    last_error = ""
     for model_name in models_to_try:
         payload = {
             "model": model_name,
@@ -67,10 +72,13 @@ TEXT TO TRANSLATE:
                 
         except urllib.error.HTTPError as he:
             err_body = he.read().decode('utf-8')
-            if "model_not_found" in err_body:
-                continue  # తదుపరి మోడల్‌తో ప్రయత్నిస్తుంది
-            return f"⚠️ API Error ({he.code}): {err_body}"
+            last_error = f"API Error ({he.code}): {err_body}"
+            # మోడల్ నిలిపివేయబడినా లేదా లేకపోయినా తర్వాతి మోడల్‌కి వెళ్తుంది
+            if he.code in [400, 404]:
+                continue
+            return f"⚠️ {last_error}"
         except Exception as e:
-            return f"⚠️ Connection Error: {str(e)}"
+            last_error = str(e)
+            continue
 
-    return "⚠️ Error: Unable to connect with available Groq models."
+    return f"⚠️ Translation Connection Failed: {last_error}"
