@@ -2,40 +2,58 @@ import json
 import urllib.request
 import streamlit as st
 
-def polish_and_translate_script(
+def polish_speech_script(
     text, 
-    target_lang="హిందీ (सरल व आध्यात्मिक शैली)", 
     style_mode="📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)", 
-    pause_level="మధ్యస్థం (Normal Pauses)"
+    pause_level="మధ్యస్థం (Normal Pauses)", 
+    user_instruction=""
 ):
+    """
+    Groq AI ద్వారా స్పీచ్ స్క్రిప్ట్‌ను గౌరవప్రదమైన శైలితో పాలిష్ చేసి,
+    సహజమైన శ్వాస విరామాలు (... మరియు కామాలు) అమర్చే కోర్ ఇంజిన్.
+    """
     if not text or not text.strip():
         return ""
         
     groq_key = st.secrets.get("GROQ_API_KEY", "")
     if not groq_key:
-        return "⚠️ Groq API Key Not Found! Please check secrets.toml"
+        return text
 
-    # భాషా సూచనలు (Strict Translation Rules)
-    if "హిందీ" in target_lang:
-        instruction = "MANDATORY: Translate the entire text into pure, respectful HINDI written in Devanagari script (हिन्दी). Do NOT output Telugu words. Use respectful Brahma Kumaris spiritual tone (e.g. 'आत्मिक भाई-बहनों को सादर ॐ शांति', 'रक्तदान महादान', 'आप सभी सादर आमंत्रित हैं')."
-    elif "ఇంగ్లీష్" in target_lang or "English" in target_lang:
-        instruction = "MANDATORY: Translate the entire text into dignified, inspiring, fluent ENGLISH. Do NOT output Telugu words."
-    elif "తెలుగు" in target_lang:
-        instruction = "MANDATORY: Refine and polish the text into highly respectful Brahma Kumaris & Krishna district dignified Telugu ('ఆత్మ బంధువులందరికీ హృదయపూర్వక నమస్కారం / ఓంశాంతి', 'ఈ మహోన్నత సేవలో పాల్గొనగలరు')."
-    else:
-        instruction = "Keep the original language and polish speech pacing."
+    style_guidelines = {
+        "🧘 ఆధ్యాత్మికం (Spiritual & Calm)": "Use deeply peaceful, reverent pacing, thoughtful breathing pauses (...) after every key phrase. Use dignified Telugu.",
+        "📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)": "Crisp, authoritative, clear pauses. Highlight dates, venues, timings, and calls to action.",
+        "📰 న్యూస్ రీడర్ (News Bulletin)": "Fast, formal, structured delivery with minimal ellipsis and concise punctuation.",
+        "🗣️ సంభాషణ / కబుర్లు (Conversational)": "Warm, engaging, natural conversational tone with soft pauses."
+    }
 
-    prompt_content = f"""You are an elite multilingual translator and speech director.
-TASK: {instruction}
+    pause_guidelines = {
+        "స్వల్పం (Fast / Light Pauses)": "Use minimal commas, tight phrasing, fast flow.",
+        "మధ్యస్థం (Normal Pauses)": "Standard rhythm (3-5 words per clause), using commas and short ellipses (...) at phrase breaks.",
+        "ఎక్కువ (Deep Breathing / Heavy Pauses)": "Frequent ellipsis (...) after every concept, 2-3 words per phrase, slow cadence."
+    }
 
-RULES:
-1. Output ONLY the translated speech text in the target language.
-2. Insert breathing pauses (...) and commas (,) naturally.
-3. Put dates, times, venues, and key calls to action on separate lines.
-4. No intro, no markdown codeblocks, no explanations.
+    selected_style_rule = style_guidelines.get(style_mode, style_guidelines["📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)"])
+    selected_pause_rule = pause_guidelines.get(pause_level, pause_guidelines["మధ్యస్థం (Normal Pauses)"])
 
-TEXT TO TRANSLATE:
-{text}"""
+    system_prompt = f"""You are a master speech director and voiceover scriptwriter specializing in Telugu, Hindi, and English public notices and spiritual discourses.
+
+YOUR MISSION:
+1. SCRIPT POLISHING & FIXES:
+   - Correct misheard words, spelling mistakes, and grammar from voice STT.
+   - Maintain a highly respectful, polite, and dignified tone.
+
+2. VOICE & SPEECH PACING:
+   - Target Style: {selected_style_rule}
+   - Target Pause Density: {selected_pause_rule}
+   - Insert breathing pauses (...) and commas (,) naturally where a professional speaker pauses to breathe or emphasize key points.
+   - Break speech into short readable clauses on separate lines for key facts (greetings, dates, times, venues, conclusions).
+
+3. USER INSTRUCTION:
+   {user_instruction if user_instruction.strip() else "Format with natural pacing and clean rhythm."}
+
+4. STRICT OUTPUT:
+   - Output ONLY the polished final spoken script.
+   - No explanations, notes, or meta text."""
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -44,37 +62,30 @@ TEXT TO TRANSLATE:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     }
     
-    # ప్రస్తుతం Groq లో లైవ్ లో ఉన్న అధికారిక మోడల్స్
-    models_to_try = [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant"
-    ]
+    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 
-    last_error = ""
-    for model_name in models_to_try:
+    for model_name in models:
         payload = {
             "model": model_name,
             "messages": [
-                {"role": "user", "content": prompt_content}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Polish this text for speech:\n\n{text}"}
             ],
             "temperature": 0.2
         }
 
         try:
-            json_data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
-            req = urllib.request.Request(url, data=json_data, headers=headers, method='POST')
-            
-            with urllib.request.urlopen(req, timeout=20) as response:
+            req = urllib.request.Request(
+                url, 
+                data=json.dumps(payload, ensure_ascii=False).encode('utf-8'), 
+                headers=headers, 
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=18) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
-                translated_result = res_data['choices'][0]['message']['content'].strip()
-                return translated_result
-                
-        except urllib.error.HTTPError as he:
-            err_body = he.read().decode('utf-8')
-            last_error = f"API Error ({he.code}): {err_body}"
-            continue
-        except Exception as e:
-            last_error = str(e)
+                polished = res_data['choices'][0]['message']['content'].strip()
+                return polished
+        except Exception:
             continue
 
-    return f"⚠️ Translation Connection Failed: {last_error}"
+    return text
