@@ -5,11 +5,10 @@ from datetime import datetime
 import docx
 from streamlit_mic_recorder import speech_to_text
 from services.audio_engine import transcribe_audio_file, synthesize_multilang_tts
-from services.groq_polisher import polish_and_translate_script
 from services.image_poster import generate_ai_poster_html
 
 # ==========================================
-# 1. పేజీ సెట్టింగ్స్ & UI స్టైల్స్
+# 1. పేజీ సెట్టింగ్స్ & స్టైల్స్
 # ==========================================
 st.set_page_config(
     page_title="BRAHMA AI Studio", 
@@ -42,15 +41,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.subheader("🕉️ BRAHMA AI : Studio (Multilingual Voice & Poster)")
+st.subheader("🕉️ BRAHMA AI : Studio (Voice, Poster & Animated GIF)")
 
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
     st.session_state.main_text = ""
-if "translated_text" not in st.session_state:
-    st.session_state.translated_text = ""
-if "trans_key_counter" not in st.session_state:
-    st.session_state.trans_key_counter = 0
 if "audio_bytes_data" not in st.session_state:
     st.session_state.audio_bytes_data = None
 if "poster_html_data" not in st.session_state:
@@ -59,7 +54,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Accurate Multilingual Translation Online.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Clean Voice & Graphic Studio Online.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -93,39 +88,31 @@ def create_printable_pdf_html(text):
 
 
 # ==========================================
-# 2. AI స్పీచ్ స్టైల్ & పోస్టర్ సెట్టింగ్స్
+# 2. AI పోస్టర్ & లేఅవుట్ సెట్టింగ్స్
 # ==========================================
-with st.expander("⚙️ AI CONTROLS (స్పీచ్ స్టైల్, థీమ్స్ & పోస్టర్ లేఅవుట్)", expanded=False):
-    col_style, col_pause = st.columns(2)
-    with col_style:
-        selected_style = st.selectbox("🎭 స్పీచ్ స్టైల్:", options=["📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)", "🧘 ఆధ్యాత్మికం (Spiritual & Calm)", "📰 న్యూస్ రీడర్ (News Bulletin)", "🗣️ సంభాషణ / కబుర్లు (Conversational)"])
-    with col_pause:
-        selected_pause = st.selectbox("⏱️ శ్వాస విరామాలు:", options=["మధ్యస్థం (Normal Pauses)", "ఎక్కువ (Deep Breathing / Heavy Pauses)", "స్వల్పం (Fast / Light Pauses)"])
-
+with st.expander("🎨 AI POSTER CONTROLS (కలర్ థీమ్, స్టిక్కర్లు & టెక్స్ట్ సైజ్)", expanded=False):
     col_th, col_stk = st.columns(2)
     with col_th:
         poster_theme = st.selectbox("🎨 పోస్టర్ కలర్ థీమ్:", options=["ఆధ్యాత్మికం (Golden Divine)", "రక్తదానం / సేవా కార్యక్రమం (Red & White)", "ప్రకృతి / పచ్చదనం (Nature Green)", "రాయల్ బ్లూ (Corporate & Formal)"])
     with col_stk:
         sticker_choice = st.selectbox(
-            "🏷️ AI స్టిక్కర్స్ / బ్యాడ్జ్ ఎంపిక:",
+            "🏷️ AI స్టిక్కర్స్ / చిహ్నం ఎంపిక:",
             options=["🪄 AI మ్యాజిక్ (Auto Select)", "🕉️ ఓం (Divine Om)", "🪷 పద్మం (Sacred Lotus)", "🩸 రక్తదానం (Blood Drop)", "🕊️ శాంతి కపోతం (Peace Dove)", "🌟 గోల్డెన్ స్టార్ (Golden Star)", "📜 రాయల్ సీల్ (Royal Seal)", "❤️ సేవా హస్తం (Loving Care)"]
         )
 
-    col_mode, col_align, col_fsize = st.columns(3)
-    with col_mode:
-        content_mode = st.selectbox("📝 కంటెంట్ మోడ్:", options=["📜 పూర్తి మ్యాటర్ (Full Exact Text)", "🤖 AI సారాంశం (Summary Points)"])
+    col_align, col_fsize = st.columns(2)
     with col_align:
         text_align = st.selectbox("📐 టెక్స్ట్ అమరిక (Alignment):", options=["ఎడమ వైపు (Left)", "మధ్యలో (Center)", "సమానంగా (Justify)"])
     with col_fsize:
         font_size_choice = st.selectbox("🔤 అక్షరాల సైజు (Font Size):", options=["మధ్యస్థం (Medium - 18px)", "చిన్నది (Small - 15px)", "పెద్దది (Large - 22px)", "చాలా పెద్దది (X-Large - 26px)"])
 
-    custom_sticker_file = st.file_uploader("🖼️ కస్టమ్ లోగో/స్టిక్కర్ అప్‌లోడ్:", type=["png", "jpg", "jpeg", "webp"], key="cust_sticker_up")
+    custom_sticker_file = st.file_uploader("🖼️ కస్టమ్ లోగో / స్టిక్కర్ అప్‌లోడ్ (Optional):", type=["png", "jpg", "jpeg", "webp"], key="cust_sticker_up")
 
 
 # ==========================================
 # 3. నాలుగు ఇన్‌పుట్ విభాగాలు (DOC | AUDIO | MIC | PASTE)
 # ==========================================
-with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC / PASTE)", expanded=True):
+with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
     c_file, c_audio_stt, c_mic = st.columns([0.33, 0.34, 0.33])
 
     with c_file:
@@ -136,7 +123,6 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC / PASTE)", expanded=
                 f_text = extract_text_from_file(uploaded_file)
                 if f_text and f_text != st.session_state.main_text:
                     st.session_state.main_text = f_text
-                    st.session_state.translated_text = ""
                     add_log(f"DOC Loaded: {uploaded_file.name}", "#4ade80")
                     st.toast(f"✅ {uploaded_file.name} Loaded!")
             except Exception as fe:
@@ -144,7 +130,7 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC / PASTE)", expanded=
 
     with c_audio_stt:
         st.markdown("**🎵 AUDIO STT (Multi-min)**")
-        stt_lang_choice = st.selectbox("Audio Input Lang:", options=["🔄 Auto (Multi-Lang)", "HI (हिंदी)", "TE (తెలుగు)", "EN (English)"], key="stt_lang_choice", label_visibility="collapsed")
+        stt_lang_choice = st.selectbox("Audio Input Lang:", options=["🔄 Auto (Multi-Lang)", "TE (తెలుగు)", "HI (हिंदी)", "EN (English)"], key="stt_lang_choice", label_visibility="collapsed")
         stt_lang_map = {"🔄 Auto (Multi-Lang)": "auto", "TE (తెలుగు)": "te-IN", "HI (हिंदी)": "hi-IN", "EN (English)": "en-IN"}
         selected_stt_lang = stt_lang_map[stt_lang_choice]
 
@@ -153,14 +139,13 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC / PASTE)", expanded=
             st.audio(uploaded_audio)
             use_dsp = st.checkbox("✨ DSP Booster", value=True, key="stt_dsp_chk")
             if st.button("🚀 RUN STT", use_container_width=True):
-                add_log(f"STT Started: {uploaded_audio.name} ({stt_lang_choice})", "#c084fc")
+                add_log(f"STT Started: {uploaded_audio.name}", "#c084fc")
                 with st.spinner("Transcribing Voice..."):
                     raw_txt = transcribe_audio_file(uploaded_audio, lang_code=selected_stt_lang, enable_dsp=use_dsp)
                     if raw_txt and not raw_txt.startswith("⚠️"):
                         st.session_state.main_text = raw_txt.strip()
-                        st.session_state.translated_text = ""
                         add_log(f"STT Ready ({len(raw_txt)} chars)", "#4ade80")
-                        st.toast("✅ టెక్స్ట్ లోడ్ అయింది!")
+                        st.toast("✅ టెక్స్ట్ సిద్ధమైంది!")
                         st.rerun()
                     else:
                         st.error(raw_txt)
@@ -178,94 +163,35 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC / PASTE)", expanded=
         )
         if spoken_result and spoken_result != st.session_state.last_mic_text:
             st.session_state.main_text = (st.session_state.main_text + "\n\n" + spoken_result).strip()
-            st.session_state.translated_text = ""
             st.session_state.last_mic_text = spoken_result
             add_log(f"MIC: '{spoken_result}'", "#4ade80")
             st.rerun()
 
 
 # ==========================================
-# 4. బాక్స్ 1: మూల వచనం (Source Text Box)
+# 4. ప్రధాన కంటెంట్ ఎడిటర్ బాక్స్ (Main Text Editor)
 # ==========================================
-st.markdown("##### 📝 మూల వచనం (Source Text Box)")
+st.markdown("##### 📝 కంటెంట్ ఎడిటర్ (Content Editor & Speech Script)")
 user_input_text = st.text_area(
-    "Original Source Content", 
+    "Main Content", 
     value=st.session_state.main_text, 
-    height=120,
-    placeholder="ఆడియో/మైక్/ఫైల్ నుంచి వచ్చిన లేదా ఇక్కడ నేరుగా పేస్ట్ చేసిన మూల వచనం...",
+    height=150,
+    placeholder="ఆడియో/మైక్/ఫైల్ నుంచి వచ్చిన లేదా ఇక్కడ నేరుగా పేస్ట్ చేసిన టెక్స్ట్ ఇక్కడ కనిపిస్తుంది...",
     label_visibility="collapsed"
 )
 if user_input_text != st.session_state.main_text:
     st.session_state.main_text = user_input_text
 
-
-# ==========================================
-# 5. మధ్యలో ట్రాన్స్‌లేటర్ బార్ (Middle Translation Bar)
-# ==========================================
-col_mid_lbl, col_mid_lang, col_mid_btn = st.columns([0.25, 0.45, 0.3])
-
-with col_mid_lbl:
-    st.markdown("##### 🌐 ట్రాన్స్‌లేటర్ (AI):")
-
-with col_mid_lang:
-    target_trans_lang = st.selectbox(
-        "మార్చాల్సిన భాష ఎంపిక:",
-        options=[
-            "హిందీ (सरल व आध्यात्मिक शैली)",
-            "తెలుగు (గౌరవప్రదమైన కృష్ణా యాస / BK)",
-            "ఇంగ్లీష్ (Dignified English)",
-            "🔄 అసలు భాష (Original Polish Only)"
-        ],
-        index=0,
-        label_visibility="collapsed"
-    )
-
-with col_mid_btn:
-    if st.button("✨ అప్లై / అనువదించు (Apply Translation)", type="secondary", use_container_width=True):
-        if st.session_state.main_text.strip():
-            with st.spinner(f"{target_trans_lang} లోకి ఖచ్చితంగా అనువదిస్తోంది..."):
-                translated_res = polish_and_translate_script(
-                    st.session_state.main_text, 
-                    target_lang=target_trans_lang, 
-                    style_mode=selected_style, 
-                    pause_level=selected_pause
-                )
-                if translated_res:
-                    st.session_state.translated_text = translated_res
-                    st.session_state.trans_key_counter += 1
-                    add_log(f"అనువాదం పూర్తయింది -> {target_trans_lang}", "#38bdf8")
-                    st.toast(f"✨ అనువాదం సిద్ధమైంది ({target_trans_lang})!", icon="✨")
-                    st.rerun()
-        else:
-            st.warning("దయచేసి మూల వచనం బాక్స్‌లో టెక్స్ట్ ఎంటర్ చేయండి.")
+active_text = st.session_state.main_text.strip()
 
 
 # ==========================================
-# 6. బాక్స్ 2: అనువాద ఫలితం (Final Translated Script)
-# ==========================================
-st.markdown("##### ✨ గౌరవప్రదమైన స్పీచ్ & అనువాద స్క్రిప్ట్ (Final Translated Script)")
-active_default_val = st.session_state.translated_text if st.session_state.translated_text else st.session_state.main_text
-trans_area = st.text_area(
-    "Translated Content", 
-    value=active_default_val, 
-    height=130,
-    key=f"trans_area_box_{st.session_state.trans_key_counter}",
-    label_visibility="collapsed"
-)
-if trans_area != st.session_state.translated_text and st.session_state.translated_text != "":
-    st.session_state.translated_text = trans_area
-
-# ఆడియో & పోస్టర్ కోసం యాక్టివ్ టెక్స్ట్
-active_text = trans_area.strip() if trans_area.strip() else st.session_state.main_text.strip()
-
-
-# ==========================================
-# 7. TTS సెట్టింగ్స్
+# 5. TTS సెట్టింగ్స్
 # ==========================================
 with st.expander("⚙️ TTS SETTINGS (స్వరం, స్పీడ్ & BGM)", expanded=True):
     col_tts_lang, col_tts_voice = st.columns([0.45, 0.55])
     with col_tts_lang:
-        tts_lang = st.selectbox("🌐 TTS Mode:", options=["🔄 Auto Detect (Multi-Lang)", "Hindi (हिंदी)", "Telugu (తెలుగు)", "English"], key="main_tts_lang_select")
+        tts_lang = st.selectbox("🌐 TTS Mode:", options=["🔄 Auto Detect (Multi-Lang)", "Telugu (తెలుగు)", "Hindi (हिंदी)", "English"], key="main_tts_lang_select")
     with col_tts_voice:
         gender_choice = st.radio("Voice Gender:", options=["👨 Male (పురుష)", "👩 Female (స్త్రీ)"], horizontal=True, key="gender_sel")
 
@@ -285,7 +211,7 @@ with st.expander("⚙️ TTS SETTINGS (స్వరం, స్పీడ్ & BGM
 
 
 # ==========================================
-# 8. ప్రధాన యాక్షన్ కంట్రోల్స్
+# 6. ప్రధాన యాక్షన్ కంట్రోల్స్
 # ==========================================
 b1, b2, b3, b4 = st.columns(4)
 b5, b6, b7 = st.columns(3)
@@ -295,22 +221,21 @@ with b1:
 
 with b2:
     if active_text:
-        if st.button("🖼️ AI POSTER", use_container_width=True):
-            with st.spinner("పోస్టర్ సిద్ధమవుతోంది..."):
+        if st.button("🖼️ AI POSTER (ఇమేజ్ & GIF)", use_container_width=True):
+            with st.spinner("పోస్టర్ & యానిమేషన్ సిద్ధమవుతోంది..."):
                 poster_html = generate_ai_poster_html(
                     active_text, 
                     theme=poster_theme, 
                     sticker_choice=sticker_choice, 
-                    content_mode=content_mode,
                     text_align=text_align,
                     font_size_choice=font_size_choice,
                     custom_sticker_file=custom_sticker_file
                 )
                 st.session_state.poster_html_data = poster_html
-                add_log("పోస్టర్ సిద్ధమైంది!", "#4ade80")
+                add_log("పోస్టర్ & యానిమేషన్ సిద్ధమైంది!", "#4ade80")
                 st.toast("🖼️ పోస్టర్ సిద్ధమైంది!", icon="🖼️")
     else:
-        st.button("🖼️ AI POSTER", disabled=True, use_container_width=True)
+        st.button("🖼️ AI POSTER (ఇమేజ్ & GIF)", disabled=True, use_container_width=True)
 
 with b3:
     if active_text:
@@ -344,8 +269,6 @@ with b6:
 with b7:
     if st.button("🧹 CLEAR", use_container_width=True):
         st.session_state.main_text = ""
-        st.session_state.translated_text = ""
-        st.session_state.trans_key_counter += 1
         st.session_state.audio_bytes_data = None
         st.session_state.poster_html_data = None
         st.session_state.last_mic_text = ""
@@ -355,16 +278,16 @@ with b7:
 
 
 # ==========================================
-# 9. AI పోస్టర్ ప్రివ్యూ విభాగం
+# 7. AI పోస్టర్ & GIF ప్రివ్యూ విభాగం
 # ==========================================
 if st.session_state.poster_html_data is not None:
     st.divider()
-    st.markdown("### 🖼️ పోస్టర్ కార్డ్ ప్రివ్యూ (Smart Poster Card)")
-    st.components.v1.html(st.session_state.poster_html_data, height=830, scrolling=True)
+    st.markdown("### 🖼️ పోస్టర్ & యానిమేషన్ కార్డ్ (Smart Poster & GIF Studio)")
+    st.components.v1.html(st.session_state.poster_html_data, height=860, scrolling=True)
 
 
 # ==========================================
-# 10. TTS ఆడియో జనరేషన్
+# 8. TTS ఆడియో జనరేషన్
 # ==========================================
 if convert_btn:
     if active_text:
