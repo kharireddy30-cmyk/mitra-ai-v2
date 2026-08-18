@@ -4,14 +4,13 @@ import streamlit as st
 
 def polish_and_translate_script(
     text, 
-    target_lang="అసలు భాష (Original)", 
+    target_lang="తెలుగు (గౌరవప్రదమైన కృష్ణా యాస / BK)", 
     style_mode="📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)", 
-    pause_level="మధ్యస్థం (Normal Pauses)", 
-    user_instruction=""
+    pause_level="మధ్యస్థం (Normal Pauses)"
 ):
     """
-    Groq AI ద్వారా స్పీచ్ స్క్రిప్ట్‌ను భావయుక్తంగా అనువదించి (Expressive Translation),
-    సహజమైన విరామాలు (... మరియు కామాలు) అమర్చే ఇంజిన్.
+    బ్రహ్మకుమారీస్ మరియు కృష్ణా జిల్లా గౌరవప్రదమైన భాషా శైలితో,
+    సహజమైన శ్వాస విరామాలు (... మరియు కామాలు) అమర్చే AI అనువాద ఇంజిన్.
     """
     if not text or not text.strip():
         return ""
@@ -20,50 +19,21 @@ def polish_and_translate_script(
     if not groq_key:
         return text
 
-    style_guidelines = {
-        "🧘 ఆధ్యాత్మికం (Spiritual & Calm)": "Use deeply peaceful, reverent pacing, longer thoughtful breathing pauses (...) after every phrase.",
-        "📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)": "Crisp, authoritative, clear pauses. Highlight dates, venues, and calls to action.",
-        "📰 న్యూస్ రీడర్ (News Bulletin)": "Fast, formal, structured delivery with minimal ellipsis and concise punctuation.",
-        "🗣️ సంభాషణ / కబుర్లు (Conversational)": "Warm, engaging, natural conversational tone with soft pauses."
-    }
+    system_prompt = """You are an elite multilingual translator and spiritual voiceover scriptwriter specializing in Brahma Kumaris (BK) respectful discourse and Krishna District refined, dignified Telugu (గౌరవప్రదమైన కృష్ణా యాస & సంస్కారవంతమైన ఆధ్యాత్మిక శైలి).
 
-    pause_guidelines = {
-        "స్వల్పం (Fast / Light Pauses)": "Use minimal commas, tight phrasing, fast flow.",
-        "మధ్యస్థం (Normal Pauses)": "Standard rhythm (3-5 words per clause), using commas and short ellipses (...) at phrase breaks.",
-        "ఎక్కువ (Deep Breathing / Heavy Pauses)": "Frequent ellipsis (...) after every concept, 2-3 words per phrase, slow cadence."
-    }
-
-    translation_instructions = {
-        "అసలు భాష (Original)": "Keep the output in the original language of the text without translating.",
-        "తెలుగు (Telugu)": "Accurately and expressively TRANSLATE the text into natural, grammatically rich Telugu (భావయుక్తమైన సహజ తెలుగు). Preserve nuances.",
-        "హిందీ (Hindi)": "Accurately and expressively TRANSLATE the text into fluent, natural Hindi (सरल और प्रभावी हिंदी).",
-        "ఇంగ్లీష్ (English)": "Accurately and expressively TRANSLATE the text into polished, fluent English with natural flow."
-    }
-
-    selected_style_rule = style_guidelines.get(style_mode, style_guidelines["📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)"])
-    selected_pause_rule = pause_guidelines.get(pause_level, pause_guidelines["మధ్యస్థం (Normal Pauses)"])
-    selected_trans_rule = translation_instructions.get(target_lang, translation_instructions["అసలు భాష (Original)"])
-
-    system_prompt = f"""You are a master multilingual translator and speech director specializing in Telugu, Hindi, and English spiritual discourses and public announcements.
-
-YOUR DUAL MISSION:
-1. TRANSLATION (Contextual & Expressive):
-   {selected_trans_rule}
-   - Do NOT do word-by-word literal robotic translation. Translate the TRUE MEANING, emotion, and tone (భావార్థం).
-   - Fix misheard words and grammatical errors.
-
-2. VOICE & SPEECH PACING:
-   - Target Style: {selected_style_rule}
-   - Target Pause Density: {selected_pause_rule}
-   - Insert breathing pauses (...) and commas (,) naturally where a professional speaker pauses to breathe or emphasize key points.
-   - Break speech into short readable clauses on separate lines for key facts (greetings, dates, times, venues, conclusions).
-
-3. USER INSTRUCTION:
-   {user_instruction if user_instruction.strip() else "Translate and format with natural flow."}
-
-4. STRICT OUTPUT:
-   - Output ONLY the translated, formatted final spoken script.
-   - No explanations, notes, or meta text."""
+CORE TRANSLATION & DIALECT GUIDELINES:
+1. RESPECTFUL & DIGNIFIED VOCABULARY (BK & Krishna District Telugu):
+   - Use deeply respectful honorifics: 'ఆత్మ బంధువులందరికీ హృదయపూర్వక నమస్కారం / ఓంశాంతి', 'విశేషమైన సేవ', 'సద్వినియోగం చేసుకోగలరు', 'పాల్గొనవలసిందిగా కోరుతున్నాము', 'సర్వేజనా సుఖినోభవంతు'.
+   - Avoid harsh, blunt, or overly casual words. Use polished, culturally rich words (e.g. 'రండి చేద్దాం' -> 'రండి! రక్తదానం చేద్దాం / ఈ మహోన్నత సేవలో భాగస్వామ్యులవుదాం').
+2. HINDI (सरल, मधुर एवं आध्यात्मिक शैली):
+   - Use respectful Hindi (e.g., 'आत्मिक भाई-बहनों को सादर नमस्कार / ॐ शांति', 'विशेष सेवा', 'आप सभी सादर आमंत्रित हैं').
+3. ENGLISH (Dignified, Warm & Inspiring):
+   - Expressive, inspiring, professional, and spiritual tone.
+4. SPEECH PACING & BREATHING PAUSES:
+   - Insert breathing pauses (...) and commas (,) naturally where a speaker takes a breath or emphasizes key points.
+   - Break speech into crisp, readable clauses on separate lines for dates, times, venues, and concluding slogans.
+5. STRICT OUTPUT RULE:
+   - Output ONLY the polished/translated speech script. No explanations or conversational introductions."""
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -74,14 +44,14 @@ YOUR DUAL MISSION:
         "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Translate and polish this content into target format:\n\n{text}"}
+            {"role": "user", "content": f"Target Language/Style: {target_lang}\nDelivery Style: {style_mode}\nPause Density: {pause_level}\n\nInput Text:\n{text}"}
         ],
         "temperature": 0.2
     }
 
     try:
         req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers, method='POST')
-        with urllib.request.urlopen(req, timeout=14) as response:
+        with urllib.request.urlopen(req, timeout=15) as response:
             res_data = json.loads(response.read().decode('utf-8'))
             polished = res_data['choices'][0]['message']['content'].strip()
             return polished
