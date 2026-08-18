@@ -11,3 +11,4 @@ python-docx
 pypdf
 deep-translator
 SpeechRecognition
+groq
