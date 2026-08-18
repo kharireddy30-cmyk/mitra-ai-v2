@@ -11,7 +11,6 @@ def fallback_auto_punctuate(text):
     if not text:
         return ""
     
-    # 8-12 పదాల తర్వాత స్వయంచాలకంగా కామాలు మరియు వాక్యాల విరామాలు అమర్చడం
     words = text.split()
     if len(words) < 5:
         return text
@@ -23,7 +22,6 @@ def fallback_auto_punctuate(text):
         result.append(word)
         word_count += 1
         
-        # హిందీ / సంస్కృతం విరామం లేదా తెలుగు విరామం
         if word_count >= 10:
             if any(char in word for char in ["है", "హై", "ఉంది", "చారే", "था", "గాక", "కరో", "చేయండి", "होने"]):
                 result.append("।\n")
@@ -32,7 +30,6 @@ def fallback_auto_punctuate(text):
             word_count = 0
             
     final_text = " ".join(result)
-    # కామాలు మరియు పూర్ణవిరామాల దగ్గర క్లీనప్
     final_text = re.sub(r'\s+([,।\.\?])', r'\1', final_text)
     final_text = re.sub(r'([,।\.\?])\s*', r'\1 ', final_text)
     final_text = re.sub(r'\n\s*', r'\n', final_text)
@@ -64,7 +61,7 @@ def polish_speech_script(
     pause_guidelines = {
         "స్వల్పం (Fast / Light Pauses)": "Add commas (,) every 6-8 words and full stops (। or .) at sentence endings.",
         "మధ్యస్థం (Normal Pauses)": "Add commas (,) every 4-6 words, full stops (। or .) after every sentence, and short breathing pauses (...) between key phrases.",
-        "ఎక్కువ (Deep Breathing / Heavy Pauses)": "Frequent ellipses (...) after every 2-4 words, commas (,), and line breaks (\n) for a slow, meditative cadence."
+        "ఎక్కువ (Deep Breathing / Heavy Pauses)": "Frequent ellipses (...) after every 2-4 words, commas (,), and line breaks (\\n) for a slow, meditative cadence."
     }
 
     selected_style_rule = style_guidelines.get(style_mode, style_guidelines["📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)"])
@@ -127,11 +124,9 @@ No introductory text, no explanations, no markdown code blocks wrapper."""
             with urllib.request.urlopen(req, timeout=18) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
                 polished = res_data['choices'][0]['message']['content'].strip()
-                # Markdown wrappers ఉన్నా తీసివేసి శుభ్రపరచడం
-                polished = re.sub(r'^
-```[a-z]*\n?', '', polished, flags=re.IGNORECASE)
-                polished = re.sub(r'\n?
-```$', '', polished)
+                # Markdown wrappers క్లీనప్
+                polished = re.sub(r'^```[a-zA-Z]*\n?', '', polished)
+                polished = re.sub(r'\n?```$', '', polished)
                 if polished and len(polished) > 5:
                     return polished.strip()
         except Exception:
