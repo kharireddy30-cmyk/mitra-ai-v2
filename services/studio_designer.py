@@ -1,49 +1,82 @@
+import json
+import urllib.request
 import base64
+import streamlit as st
 
-def get_sticker_symbol(sticker_choice, text=""):
-    stickers_map = {
-        "🕉️ ఓం (Divine Om)": "🕉️",
-        "🪷 పద్మం (Sacred Lotus)": "🪷",
-        "🩸 రక్తదానం (Blood Drop)": "🩸",
-        "🕊️ శాంతి కపోతం (Peace Dove)": "🕊️",
-        "🌟 గోల్డెన్ స్టార్ (Golden Star)": "🌟",
-        "📜 రాయల్ సీల్ (Royal Seal)": "📜",
-        "❤️ సేవా హస్తం (Loving Care)": "❤️"
+def get_ai_design_styles(text, user_prompt=""):
+    """గ్రోక్ API ద్వారా టెక్స్ట్ ఆధారిత ఆటోమేటిక్ డిజైన్ సెట్టింగ్స్"""
+    groq_key = st.secrets.get("GROQ_API_KEY", "")
+    
+    default_styles = {
+        "title": "సందేశం / ముఖ్యాంశాలు",
+        "highlight": "",
+        "textColor": "#5c0606",
+        "bgShade": "transparent",
+        "fontSize": 18,
+        "lineHeight": 1.6,
+        "topOffset": 135,
+        "auraEnabled": "block"
     }
-    if sticker_choice == "🪄 AI మ్యాజిక్ (Auto Select)":
-        clean_t = text.lower()
-        if any(k in clean_t for k in ["రక్తం", "రక్తదాన", "సేవ", "ఆసుపత్రి", "బ్లడ్", "శిబిరం"]):
-            return "🩸"
-        elif any(k in clean_t for k in ["ఓం", "శాంతి", "ధ్యానం", "భగవాన్", "ఆత్మ", "ఆధ్యాత్మిక"]):
-            return "🕉️"
-        elif any(k in clean_t for k in ["శాంతి", "ప్రశాంతత", "ప్రేమ"]):
-            return "🕊️"
-        else:
-            return "🪷"
-    return stickers_map.get(sticker_choice, "🕉️")
+    
+    if not groq_key or not text.strip():
+        return default_styles
+
+    system_prompt = """You are a master graphic designer and typography stylist.
+Analyze the user's Telugu/Hindi/English content and styling instructions. Return a strictly valid JSON object:
+{
+  "title": "Short meaningful Telugu title (2-4 words)",
+  "highlight": "One most impactful slogan/quote from text to highlight (max 8 words)",
+  "textColor": "Choose one hex code: #5c0606 (Maroon), #0f172a (Black), #ffffff (White), #facc15 (Gold), #1e3a8a (Royal Blue)",
+  "bgShade": "Choose one: transparent, rgba(255,255,255,0.45), rgba(0,0,0,0.45)",
+  "fontSize": 18,
+  "lineHeight": 1.6,
+  "topOffset": 135,
+  "auraEnabled": "block or none"
+}
+STRICT JSON ONLY. No markdown, no conversational text."""
+
+    user_content = f"CONTENT:\n{text}\n\nUSER COMMAND/WISH:\n{user_prompt if user_prompt else 'Make it divine, elegant, readable, and respectful.'}"
+
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content}
+        ],
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"}
+    }
+
+    try:
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {groq_key.strip()}",
+            "Content-Type": "application/json; charset=utf-8",
+            "User-Agent": "Mozilla/5.0"
+        }
+        req = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode('utf-8'), headers=headers, method='POST')
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            res_data = json.loads(resp.read().decode('utf-8'))
+            parsed = json.loads(res_data['choices'][0]['message']['content'])
+            default_styles.update(parsed)
+            return default_styles
+    except Exception:
+        return default_styles
 
 def render_live_studio_poster(
     text, 
-    theme="ఆధ్యాత్మికం (Golden Divine)", 
-    sticker_choice="🪄 AI మ్యాజిక్ (Auto Select)", 
-    content_mode="📜 పూర్తి మ్యాటర్ (Full Exact Text)",
-    text_align="ఎడమ వైపు (Left)",
-    font_size_choice="మధ్యస్థం (Medium - 18px)",
+    user_prompt="",
     custom_sticker_file=None,
     custom_bg_file=None
 ):
     if not text or not text.strip():
         return ""
 
-    theme_styles = {
-        "ఆధ్యాత్మికం (Golden Divine)": "linear-gradient(135deg, #180928 0%, #31134e 50%, #150624 100%)",
-        "రక్తదానం / సేవా కార్యక్రమం (Red & White)": "linear-gradient(135deg, #660e0e 0%, #8c1616 50%, #3e0505 100%)",
-        "ప్రకృతి / పచ్చదనం (Nature Green)": "linear-gradient(135deg, #04382a 0%, #065f46 50%, #02231b 100%)",
-        "రాయల్ బ్లూ (Corporate & Formal)": "linear-gradient(135deg, #091326 0%, #172d5c 50%, #060e1d 100%)"
-    }
-    bg_style = theme_styles.get(theme, theme_styles["ఆధ్యాత్మికం (Golden Divine)"])
+    # గ్రోక్ AI ద్వారా ఆటోమేటిక్ స్టైల్స్ నిర్ణయం
+    ai_cfg = get_ai_design_styles(text, user_prompt)
 
     has_custom_bg = False
+    bg_style = "linear-gradient(135deg, #180928 0%, #31134e 50%, #150624 100%)"
     if custom_bg_file is not None:
         try:
             custom_bg_file.seek(0)
@@ -64,30 +97,36 @@ def render_live_studio_poster(
         except Exception:
             pass
 
-    selected_symbol = get_sticker_symbol(sticker_choice, text)
-    top_sticker_display = custom_img_html if custom_img_html else f"<div class='sticker-badge'>{selected_symbol}</div>"
-
+    top_sticker_display = custom_img_html if custom_img_html else "<div class='sticker-badge'>🕉️</div>"
     paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
     body_content_html = "".join([f"<p class='content-p'>{p}</p>" for p in paragraphs])
+
+    init_top = ai_cfg.get("topOffset", 135 if has_custom_bg else 10)
+    init_color = ai_cfg.get("textColor", "#5c0606")
+    init_bg = ai_cfg.get("bgShade", "transparent")
+    init_font = ai_cfg.get("fontSize", 18)
+    init_line_h = ai_cfg.get("lineHeight", 1.6)
+    init_hl = ai_cfg.get("highlight", "")
+    init_title = ai_cfg.get("title", "సందేశం / ముఖ్యాంశాలు")
+    init_aura = ai_cfg.get("auraEnabled", "block")
 
     html_code = f"""<!DOCTYPE html>
 <html lang="te">
 <head>
 <meta charset="utf-8">
-<title>Live Divine Studio & Animated GIF Pro</title>
+<title>Live Divine Studio & AI Command</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.3.2/gifshot.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Mandali&family=Suranna&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Mandali&display=swap');
   * {{ box-sizing: border-box; font-family: 'Mandali', sans-serif; }}
   body {{ margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; background: #070a13; color: #fff; }}
   
-  /* ప్రొఫెషనల్ కంట్రోల్ ప్యానెల్ */
   .control-panel {{
       width: 100%; max-width: 650px; background: #111827; border: 1px solid #374151;
       border-radius: 14px; padding: 14px 18px; margin-bottom: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.7);
   }}
-  .panel-title {{ font-size: 14px; font-weight: bold; color: #facc15; text-align: center; margin-bottom: 12px; letter-spacing: 0.5px; }}
+  .panel-title {{ font-size: 14px; font-weight: bold; color: #facc15; text-align: center; margin-bottom: 12px; }}
   
   .ctrl-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 10px; }}
   .ctrl-item {{ display: flex; flex-direction: column; font-size: 11px; font-weight: 600; color: #9ca3af; }}
@@ -99,10 +138,9 @@ def render_live_studio_poster(
   }}
 
   .btn-row {{ display: flex; gap: 12px; justify-content: center; margin-top: 14px; }}
-  .btn-png {{ background: #facc15; color: #000; border: none; padding: 9px 20px; border-radius: 7px; font-weight: bold; cursor: pointer; font-size: 13px; box-shadow: 0 4px 12px rgba(250,204,21,0.3); }}
-  .btn-gif {{ background: #ec4899; color: #fff; border: none; padding: 9px 20px; border-radius: 7px; font-weight: bold; cursor: pointer; font-size: 13px; box-shadow: 0 4px 12px rgba(236,72,153,0.4); }}
+  .btn-png {{ background: #facc15; color: #000; border: none; padding: 9px 20px; border-radius: 7px; font-weight: bold; cursor: pointer; font-size: 13px; }}
+  .btn-gif {{ background: #ec4899; color: #fff; border: none; padding: 9px 20px; border-radius: 7px; font-weight: bold; cursor: pointer; font-size: 13px; }}
 
-  /* పోస్టర్ కాన్వాస్ కార్డ్ */
   .poster-card {{
       width: 100%; max-width: 580px; min-height: 760px; background: {bg_style};
       border: 3px solid #facc15; border-radius: 18px; padding: 20px; color: #ffffff;
@@ -110,7 +148,6 @@ def render_live_studio_poster(
       display: flex; flex-direction: column; justify-content: space-between;
   }}
 
-  /* కిరణాలు & జ్యోతి లైవ్ ఎఫెక్ట్స్ (Divine Rays Animation) */
   @keyframes pulseRays {{
       0% {{ transform: translate(-50%, 0) scale(0.85); opacity: 0.35; filter: drop-shadow(0 0 10px #f59e0b); }}
       50% {{ transform: translate(-50%, 0) scale(1.25); opacity: 0.85; filter: drop-shadow(0 0 35px #fbbf24); }}
@@ -121,37 +158,31 @@ def render_live_studio_poster(
       50% {{ text-shadow: 0 0 18px rgba(250,204,21,0.95), 0 0 30px #f59e0b; }}
       100% {{ text-shadow: 0 0 4px rgba(250,204,21,0.3); }}
   }}
-  @keyframes floatingSparkles {{
-      0% {{ opacity: 0.2; transform: translateY(0px) rotate(0deg); }}
-      50% {{ opacity: 1; transform: translateY(-8px) rotate(180deg); }}
-      100% {{ opacity: 0.2; transform: translateY(0px) rotate(360deg); }}
-  }}
 
   .divine-aura-bottom {{
       position: absolute; bottom: 35px; left: 50%; width: 140px; height: 140px;
       border-radius: 50%; background: radial-gradient(circle, rgba(251,191,36,0.8) 0%, rgba(245,158,11,0.4) 45%, transparent 70%);
       pointer-events: none; z-index: 1; animation: pulseRays 2.2s infinite ease-in-out;
   }}
-  .sparkle-decor {{ position: absolute; font-size: 20px; color: #fde047; pointer-events: none; animation: floatingSparkles 3s infinite ease-in-out; }}
+  .sparkle-decor {{ position: absolute; font-size: 20px; color: #fde047; pointer-events: none; }}
 
   .header-box {{ text-align: center; margin-bottom: 8px; z-index: 2; {'display: none;' if has_custom_bg else ''} }}
   .header-title {{ font-size: 24px; font-weight: bold; color: #facc15; animation: shimmerText 2.5s infinite; }}
   .sticker-badge {{ font-size: 38px; display: inline-block; filter: drop-shadow(0 0 8px #facc15); }}
   
-  /* టెక్స్ట్ బాక్స్ */
   .content-canvas {{
       width: 88%; margin: 0 auto; padding: 12px;
       transition: all 0.1s ease-in-out; position: relative; z-index: 2;
-      font-size: 19px; line-height: 1.65; color: #5c0606;
+      font-size: {init_font}px; line-height: {init_line_h}; color: {init_color};
+      background: {init_bg}; border-radius: 10px; margin-top: {init_top}px;
       text-shadow: 0 1px 2px rgba(255,255,255,0.7);
   }}
   .content-p {{ margin-bottom: 10px; }}
 
-  /* స్పెషల్ హైలైట్ బ్యానర్ */
   .special-highlight-card {{
-      display: none; margin-top: 10px; padding: 8px 12px; text-align: center;
+      display: {'block' if init_hl else 'none'}; margin-top: 10px; padding: 8px 12px; text-align: center;
       background: linear-gradient(90deg, rgba(250,204,21,0.2), rgba(250,204,21,0.6), rgba(250,204,21,0.2));
-      border: 1px solid #facc15; border-radius: 8px; font-weight: bold; font-size: 20px; color: #7f1d1d;
+      border: 1px solid #facc15; border-radius: 8px; font-weight: bold; font-size: 19px; color: #7f1d1d;
       animation: shimmerText 2s infinite;
   }}
   
@@ -164,12 +195,12 @@ def render_live_studio_poster(
 <body>
 
 <div class="control-panel">
-  <div class="panel-title">✨ లైవ్ డిజైనర్ & GIF ఆరా కంట్రోలర్ (Live Divine Studio)</div>
+  <div class="panel-title">🎛️ లైవ్ ట్యూనింగ్ ప్యానెల్ (AI Styles Applied)</div>
   
   <div class="ctrl-grid">
     <div class="ctrl-item">
       <label>↕️ ఎత్తు (Top Offset):</label>
-      <input type="range" id="rngTop" min="0" max="350" value="{'135' if has_custom_bg else '10'}" oninput="updateLayout()">
+      <input type="range" id="rngTop" min="0" max="350" value="{init_top}" oninput="updateLayout()">
     </div>
     <div class="ctrl-item">
       <label>↔️ బాక్స్ వెడల్పు (%):</label>
@@ -177,34 +208,36 @@ def render_live_studio_poster(
     </div>
     <div class="ctrl-item">
       <label>🔤 అక్షరాల సైజు (px):</label>
-      <input type="range" id="rngFontSize" min="14" max="28" value="18" oninput="updateLayout()">
+      <input type="range" id="rngFontSize" min="14" max="28" value="{init_font}" oninput="updateLayout()">
     </div>
     <div class="ctrl-item">
-      <label>📏 వాక్యాల దూరం (Line Spacing):</label>
-      <input type="range" id="rngLineHeight" min="1.2" max="2.4" step="0.1" value="1.6" oninput="updateLayout()">
+      <label>📏 వాక్యాల దూరం:</label>
+      <input type="range" id="rngLineHeight" min="1.2" max="2.4" step="0.1" value="{init_line_h}" oninput="updateLayout()">
     </div>
     <div class="ctrl-item">
       <label>🎨 టెక్స్ట్ రంగు:</label>
       <select id="selColor" onchange="updateLayout()">
+        <option value="{init_color}">AI ఎంపిక ({init_color})</option>
         <option value="#5c0606">డార్క్ మెరూన్ (Maroon)</option>
         <option value="#0f172a">రాయల్ బ్లాక్ (Black)</option>
         <option value="#ffffff">ప్యూర్ వైట్ (White)</option>
         <option value="#facc15">గోల్డెన్ ఎల్లో (Gold)</option>
-        <option value="#1e3a8a">రాయల్ బ్లూ (Blue)</option>
       </select>
     </div>
     <div class="ctrl-item">
       <label>🌫️ బ్యాక్‌గ్రౌండ్ షేడ్:</label>
       <select id="selBgShade" onchange="updateLayout()">
+        <option value="{init_bg}">AI షేడ్</option>
         <option value="transparent">పూర్తి పారదర్శకం (Clear)</option>
         <option value="rgba(255, 255, 255, 0.45)">లైట్ వైట్ గ్లాస్ (White Glass)</option>
         <option value="rgba(0, 0, 0, 0.45)">సాఫ్ట్ డార్క్ గ్లాస్ (Dark Glass)</option>
       </select>
     </div>
     <div class="ctrl-item">
-      <label>🌟 దివ్య కిరణాల ఆరా (Rays):</label>
+      <label>🌟 దివ్య కిరణాల ఆరా:</label>
       <select id="selAura" onchange="toggleAura()">
-        <option value="block">✨ ఆన్ (Shining Divine Aura)</option>
+        <option value="{init_aura}">{'✨ ఆన్ (Shining Aura)' if init_aura == 'block' else 'ఆఫ్ (Off)'}</option>
+        <option value="block">ఆన్ (On)</option>
         <option value="none">ఆఫ్ (Off)</option>
       </select>
     </div>
@@ -219,11 +252,11 @@ def render_live_studio_poster(
 
   <div class="highlight-section">
     <div class="ctrl-item">
-      <label>🚩 స్పెషల్ స్లోగన్ / కొటేషన్ హైలైట్:</label>
-      <input type="text" id="txtHighlight" placeholder="ఉదా: రక్తదానం మహోన్నత సేవ..." oninput="updateHighlight()">
+      <label>🚩 AI స్పెషల్ కొటేషన్ హైలైట్:</label>
+      <input type="text" id="txtHighlight" value="{init_hl}" placeholder="AI స్వయంగా లైన్ ఎంచుకుంటుంది..." oninput="updateHighlight()">
     </div>
     <div class="ctrl-item">
-      <label>🎨 హైలైట్ కలర్ స్టైల్:</label>
+      <label>🎨 హైలైట్ రంగు:</label>
       <select id="selHlColor" onchange="updateHighlight()">
         <option value="#7f1d1d">డీప్ రెడ్ (Deep Red)</option>
         <option value="#1e3a8a">రాయల్ బ్లూ (Royal Blue)</option>
@@ -237,22 +270,22 @@ def render_live_studio_poster(
     <button class="btn-png" onclick="saveAsImage()">📸 ఇమేజ్ (.PNG)</button>
     <button class="btn-gif" onclick="generateAnimatedGIF()">✨ యానిమేటెడ్ GIF డౌన్‌లోడ్</button>
   </div>
-  <div id="gifStatus">⏳ GIF ఫ్రేమ్స్ & ఆరా ఎఫెక్ట్స్ తయారవుతున్నాయి... 3 సెకన్లు వేచి ఉండండి...</div>
+  <div id="gifStatus">⏳ GIF ఫ్రేమ్స్ & ఆరా ఎఫెక్ట్స్ సిద్ధమవుతున్నాయి... 3 సెకన్లు వేచి ఉండండి...</div>
 </div>
 
 <div class="poster-card" id="posterCard">
   <div class="sparkle-decor" style="top: 25px; left: 30px;">✨</div>
-  <div class="sparkle-decor" style="top: 35px; right: 35px; animation-delay: 1.5s;">🌟</div>
-  <div class="divine-aura-bottom" id="divineAura"></div>
+  <div class="sparkle-decor" style="top: 35px; right: 35px;">🌟</div>
+  <div class="divine-aura-bottom" id="divineAura" style="display: {init_aura};"></div>
 
   <div class="header-box" id="headerBox">
     {top_sticker_display}
-    <div class="header-title">సందేశం / ముఖ్యాంశాలు</div>
+    <div class="header-title">{init_title}</div>
   </div>
 
   <div class="content-canvas" id="contentBox">
     {body_content_html}
-    <div class="special-highlight-card" id="specialHighlight"></div>
+    <div class="special-highlight-card" id="specialHighlight">{'✨ ' + init_hl + ' ✨' if init_hl else ''}</div>
   </div>
 
   <div class="footer-box" id="footerBox">
@@ -276,7 +309,6 @@ function updateLayout() {{
     contentBox.style.lineHeight = lineHVal;
     contentBox.style.color = colorVal;
     contentBox.style.background = bgShadeVal;
-    contentBox.style.borderRadius = "10px";
     
     if (colorVal === "#ffffff" || colorVal === "#facc15") {{
         contentBox.style.textShadow = "0 2px 6px rgba(0,0,0,0.95)";
@@ -286,7 +318,7 @@ function updateLayout() {{
 }}
 
 function updateHighlight() {{
-    const hlText = document.getElementById("txtHighlight").value.strip ? document.getElementById("txtHighlight").value.trim() : document.getElementById("txtHighlight").value;
+    const hlText = document.getElementById("txtHighlight").value.trim();
     const hlCard = document.getElementById("specialHighlight");
     const hlColor = document.getElementById("selHlColor").value;
 
@@ -309,9 +341,6 @@ function toggleAura() {{
     const val = document.getElementById("selAura").value;
     document.getElementById("divineAura").style.display = val;
 }}
-
-// ప్రారంభ అలైన్‌మెంట్
-updateLayout();
 
 function saveAsImage() {{
     const target = document.getElementById("posterCard");
