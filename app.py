@@ -47,6 +47,8 @@ st.subheader("🕉️ BRAHMA AI : Studio (Multilingual Voice & Poster)")
 # సెషన్ స్టేట్స్
 if "main_text" not in st.session_state:
     st.session_state.main_text = ""
+if "translated_text" not in st.session_state:
+    st.session_state.translated_text = ""
 if "audio_bytes_data" not in st.session_state:
     st.session_state.audio_bytes_data = None
 if "poster_html_data" not in st.session_state:
@@ -55,7 +57,7 @@ if "last_mic_text" not in st.session_state:
     st.session_state.last_mic_text = ""
 if "diag_logs" not in st.session_state:
     st.session_state.diag_logs = [
-        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. Contextual Translation & Voice Engine Online.", "color": "#38bdf8"}
+        {"time": datetime.now().strftime("%H:%M:%S"), "msg": "System Ready. BK & Krishna Respectful Translation Engine Online.", "color": "#38bdf8"}
     ]
 
 def add_log(msg, color="#38bdf8"):
@@ -89,17 +91,10 @@ def create_printable_pdf_html(text):
 
 
 # ==========================================
-# 2. AI కంట్రోల్స్ & అనువాదం (Translation Controls)
+# 2. AI స్పీచ్ స్టైల్ & పోస్టర్ సెట్టింగ్స్
 # ==========================================
-with st.expander("⚙️ AI CONTROLS (భాష మార్పు / అనువాదం, స్టైల్ & పోస్టర్)", expanded=False):
-    col_tr, col_style, col_pause = st.columns(3)
-    with col_tr:
-        target_trans_lang = st.selectbox(
-            "🌐 కావలసిన భాష (Translate Target):",
-            options=["అసలు భాష (Original)", "తెలుగు (Telugu)", "హిందీ (Hindi)", "ఇంగ్లీష్ (English)"],
-            index=0,
-            help="హిందీ లేదా ఇంగ్లీష్ ఆడియో ఉన్నా భావయుక్తమైన తెలుగులోకి అనువదిస్తుంది."
-        )
+with st.expander("⚙️ AI CONTROLS (స్పీచ్ స్టైల్, థీమ్స్ & పోస్టర్ లేఅవుట్)", expanded=False):
+    col_style, col_pause = st.columns(2)
     with col_style:
         selected_style = st.selectbox("🎭 స్పీచ్ స్టైల్:", options=["📢 పబ్లిక్ అనౌన్స్‌మెంట్ (Public Notice)", "🧘 ఆధ్యాత్మికం (Spiritual & Calm)", "📰 న్యూస్ రీడర్ (News Bulletin)", "🗣️ సంభాషణ / కబుర్లు (Conversational)"])
     with col_pause:
@@ -123,13 +118,12 @@ with st.expander("⚙️ AI CONTROLS (భాష మార్పు / అను�
         font_size_choice = st.selectbox("🔤 అక్షరాల సైజు (Font Size):", options=["మధ్యస్థం (Medium - 18px)", "చిన్నది (Small - 15px)", "పెద్దది (Large - 22px)", "చాలా పెద్దది (X-Large - 26px)"])
 
     custom_sticker_file = st.file_uploader("🖼️ కస్టమ్ లోగో/స్టిక్కర్ అప్‌లోడ్:", type=["png", "jpg", "jpeg", "webp"], key="cust_sticker_up")
-    custom_ai_note = st.text_input("💡 AIకి ప్రత్యేక ఆదేశం (Optional):", placeholder="ఉదా: భావాన్ని మార్చకుండా సరళమైన గ్రామీణ తెలుగులో అనువదించాలి...")
 
 
 # ==========================================
-# 3. ఇన్‌పుట్ విభాగాలు (DOC | AUDIO | MIC)
+# 3. నాలుగు ఇన్‌పుట్ విభాగాలు (DOC | AUDIO | MIC | PASTE)
 # ==========================================
-with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
+with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC / PASTE)", expanded=True):
     c_file, c_audio_stt, c_mic = st.columns([0.33, 0.34, 0.33])
 
     with c_file:
@@ -139,9 +133,7 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             try:
                 f_text = extract_text_from_file(uploaded_file)
                 if f_text and f_text != st.session_state.main_text:
-                    with st.spinner("AI Processing & Translation..."):
-                        polished = polish_and_translate_script(f_text, target_trans_lang, selected_style, selected_pause, custom_ai_note)
-                        st.session_state.main_text = polished if polished else f_text
+                    st.session_state.main_text = f_text
                     add_log(f"DOC Loaded: {uploaded_file.name}", "#4ade80")
                     st.toast(f"✅ {uploaded_file.name} Loaded!")
             except Exception as fe:
@@ -159,13 +151,12 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             use_dsp = st.checkbox("✨ DSP Booster", value=True, key="stt_dsp_chk")
             if st.button("🚀 RUN STT", use_container_width=True):
                 add_log(f"STT Started: {uploaded_audio.name} ({stt_lang_choice})", "#c084fc")
-                with st.spinner("Transcribing & Expressive Translation..."):
+                with st.spinner("Transcribing Voice..."):
                     raw_txt = transcribe_audio_file(uploaded_audio, lang_code=selected_stt_lang, enable_dsp=use_dsp)
                     if raw_txt and not raw_txt.startswith("⚠️"):
-                        final_script = polish_and_translate_script(raw_txt, target_trans_lang, selected_style, selected_pause, custom_ai_note)
-                        st.session_state.main_text = final_script.strip()
-                        add_log(f"STT & Translation Ready ({len(final_script)} chars)", "#4ade80")
-                        st.toast("✅ స్క్రిప్ట్ సిద్ధమైంది!")
+                        st.session_state.main_text = raw_txt.strip()
+                        add_log(f"STT Ready ({len(raw_txt)} chars)", "#4ade80")
+                        st.toast("✅ టెక్స్ట్ లోడ్ అయింది!")
                         st.rerun()
                     else:
                         st.error(raw_txt)
@@ -182,46 +173,77 @@ with st.expander("📥 INPUT SOURCES (DOC / AUDIO STT / MIC)", expanded=True):
             key='mic_rec'
         )
         if spoken_result and spoken_result != st.session_state.last_mic_text:
-            with st.spinner("Translating & Formatting Voice..."):
-                polished_live = polish_and_translate_script(spoken_result, target_trans_lang, selected_style, selected_pause, custom_ai_note)
-                st.session_state.main_text = (st.session_state.main_text + "\n\n" + (polished_live if polished_live else spoken_result)).strip()
+            st.session_state.main_text = (st.session_state.main_text + "\n\n" + spoken_result).strip()
             st.session_state.last_mic_text = spoken_result
-            add_log(f"MIC: '{spoken_result}' (Polished)", "#4ade80")
+            add_log(f"MIC: '{spoken_result}'", "#4ade80")
             st.rerun()
 
 
 # ==========================================
-# 4. MAIN TEXT CONTENT & RE-POLISH / TRANSLATE BAR
+# 4. స్పీచ్ ఎడిటర్ & ట్రాన్స్‌లేట్ కమాండ్ బార్
 # ==========================================
-col_hdr, col_polish = st.columns([0.65, 0.35])
+col_hdr, col_lang_sel, col_trans_btn = st.columns([0.4, 0.35, 0.25])
 with col_hdr:
-    st.markdown("##### 📝 స్పీచ్ & ట్రాన్స్‌లేషన్ ఎడిటర్ (Speech & Translation Editor)")
-with col_polish:
-    if st.button("✨ అనువదించు / మార్చు (Translate AI)", use_container_width=True, help="ఎంచుకున్న భాష మరియు స్టైల్ ప్రకారం అనువదించి విరామాలు సరిచేస్తుంది"):
+    st.markdown("##### 📝 మూల వచనం (Source Text Box)")
+with col_lang_sel:
+    target_trans_lang = st.selectbox(
+        "అనువదించాల్సిన భాష:",
+        options=[
+            "తెలుగు (గౌరవప్రదమైన కృష్ణా యాస / BK)",
+            "హిందీ (सरल व आध्यात्मिक शैली)",
+            "ఇంగ్లీష్ (Dignified English)",
+            "🔄 అసలు భాష (Original Polish Only)"
+        ],
+        index=0,
+        label_visibility="collapsed"
+    )
+with col_trans_btn:
+    if st.button("✨ అనువదించు / మార్చు (Translate AI)", use_container_width=True):
         if st.session_state.main_text.strip():
-            with st.spinner("Groq AI ద్వారా అనువదించి సరిచేస్తోంది..."):
-                polished = polish_and_translate_script(st.session_state.main_text, target_trans_lang, selected_style, selected_pause, custom_ai_note)
-                if polished:
-                    st.session_state.main_text = polished
-                    add_log(f"విజయవంతంగా అనువదించబడింది! -> {target_trans_lang}", "#38bdf8")
-                    st.toast(f"✨ స్క్రిప్ట్ సిద్ధమైంది! ({target_trans_lang})", icon="✨")
+            with st.spinner("BK & కృష్ణా జిల్లా గౌరవ శైలిలో అనువదిస్తోంది..."):
+                translated_res = polish_and_translate_script(
+                    st.session_state.main_text, 
+                    target_lang=target_trans_lang, 
+                    style_mode=selected_style, 
+                    pause_level=selected_pause
+                )
+                if translated_res:
+                    st.session_state.translated_text = translated_res
+                    add_log(f"అనువాదం పూర్తయింది -> {target_trans_lang}", "#38bdf8")
+                    st.toast("✨ గౌరవప్రదమైన అనువాదం సిద్ధమైంది!", icon="✨")
                     st.rerun()
         else:
-            st.warning("దయచేసి టెక్స్ట్‌ను ఎంటర్ చేయండి.")
+            st.warning("దయచేసి బాక్స్‌లో టెక్స్ట్‌ను ఎంటర్ చేయండి.")
 
+# మూల టెక్స్ట్ బాక్స్
 user_input_text = st.text_area(
-    "Content Editor", 
+    "Original Source Content", 
     value=st.session_state.main_text, 
-    height=160,
-    placeholder="Transcribed and translated speech script appears here...",
+    height=130,
+    placeholder="ఆడియో/మైక్ నుంచి వచ్చిన లేదా కాపీ చేసిన మూల వచనం ఇక్కడ కనిపిస్తుంది...",
     label_visibility="collapsed"
 )
 if user_input_text != st.session_state.main_text:
     st.session_state.main_text = user_input_text
 
+# అనువాదం జరిగిన తర్వాత కనిపించే రెండవ బాక్స్
+if st.session_state.translated_text:
+    st.markdown("##### ✨ గౌరవప్రదమైన స్పీచ్ & అనువాద స్క్రిప్ట్ (Final Translated Script)")
+    trans_area = st.text_area(
+        "Translated Content", 
+        value=st.session_state.translated_text, 
+        height=140,
+        label_visibility="collapsed"
+    )
+    if trans_area != st.session_state.translated_text:
+        st.session_state.translated_text = trans_area
+
+# ఆడియో & పోస్టర్ కోసం యాక్టివ్ టెక్స్ట్ నిర్ణయం
+active_text = st.session_state.translated_text.strip() if st.session_state.translated_text.strip() else st.session_state.main_text.strip()
+
 
 # ==========================================
-# 5. TTS SETTINGS
+# 5. TTS సెట్టింగ్స్
 # ==========================================
 with st.expander("⚙️ TTS SETTINGS (స్వరం, స్పీడ్ & BGM)", expanded=True):
     col_tts_lang, col_tts_voice = st.columns([0.45, 0.55])
@@ -248,12 +270,11 @@ with st.expander("⚙️ TTS SETTINGS (స్వరం, స్పీడ్ & BGM
 # ==========================================
 # 6. ప్రధాన యాక్షన్ కంట్రోల్స్
 # ==========================================
-active_text = st.session_state.main_text.strip()
 b1, b2, b3, b4 = st.columns(4)
 b5, b6, b7 = st.columns(3)
 
 with b1:
-    convert_btn = st.button("🔊 TTS", type="primary", use_container_width=True)
+    convert_btn = st.button("🔊 TTS (వాయిస్ చేయి)", type="primary", use_container_width=True)
 
 with b2:
     if active_text:
@@ -306,6 +327,7 @@ with b6:
 with b7:
     if st.button("🧹 CLEAR", use_container_width=True):
         st.session_state.main_text = ""
+        st.session_state.translated_text = ""
         st.session_state.audio_bytes_data = None
         st.session_state.poster_html_data = None
         st.session_state.last_mic_text = ""
