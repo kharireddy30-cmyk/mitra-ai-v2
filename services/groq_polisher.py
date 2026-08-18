@@ -13,47 +13,54 @@ def polish_and_translate_script(
         
     groq_key = st.secrets.get("GROQ_API_KEY", "")
     if not groq_key:
-        return text
+        return f"⚠️ Groq API Key Not Found! Please check secrets.toml"
 
-    # ఖచ్చితమైన భాషా మార్పిడి రూల్స్
+    # టార్గెట్ భాష ప్రకారం స్పష్టమైన డైరెక్షన్
     if "హిందీ" in target_lang:
-        instruction = "MANDATORY: You MUST translate the ENTIRE text into pure Hindi written in DEVANAGARI SCRIPT (हिन्दी लिपि). Do NOT output a single Telugu word. Use Brahma Kumaris respectful tone like 'आत्मिक भाई-बहनों को सादर ॐ शांति', 'रक्तदान महादान', 'सादर आमंत्रित हैं'."
+        instruction = "Translate the entire content into pure, respectful HINDI in Devanagari script (हिन्दी). Do NOT output Telugu words. Example tone: 'आत्मिक भाई-बहनों को सादर ॐ शांति', 'रक्तदान महादान'."
     elif "ఇంగ్లీష్" in target_lang or "English" in target_lang:
-        instruction = "MANDATORY: You MUST translate the ENTIRE text into dignified, fluent English. Do NOT output Telugu words."
+        instruction = "Translate the entire content into dignified, inspiring, and fluent ENGLISH. Do NOT output Telugu words."
     elif "తెలుగు" in target_lang:
-        instruction = "MANDATORY: Convert the text into highly respectful Brahma Kumaris & Krishna district refined Telugu with honorific words like 'ఆత్మ బంధువులందరికీ హృదయపూర్వక నమస్కారం / ఓంశాంతి', 'ఈ మహోన్నత సేవలో పాల్గొనగలరు'."
+        instruction = "Refine and polish the content into highly respectful Brahma Kumaris & Krishna district dignified Telugu ('ఆత్మ బంధువులందరికీ హృదయపూర్వక నమస్కారం / ఓంశాంతి')."
     else:
-        instruction = "Keep the original language and only add natural breathing pauses (...)."
+        instruction = "Keep the original language and polish speech pacing."
 
-    system_prompt = f"""You are a professional multilingual translator.
-
-{instruction}
+    prompt_content = f"""You are a master translator.
+TASK: {instruction}
 
 RULES:
-1. Translate fully into the requested language script.
-2. Add breathing pauses (...) and commas (,) where a voiceover speaker takes breath.
-3. Put dates, times, and key action lines on separate lines.
-4. Output ONLY the translated script. No intros, no notes, no English explanations."""
+1. Output ONLY the translated speech text.
+2. Insert breathing pauses (...) and commas (,) naturally.
+3. Put dates, times, venues on separate lines.
+4. No intro, no explanations, no markdown tags.
+
+TEXT TO TRANSLATE:
+{text}"""
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {groq_key}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json; charset=utf-8"
     }
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Translate this text now:\n\n{text}"}
+            {"role": "user", "content": prompt_content}
         ],
-        "temperature": 0.1
+        "temperature": 0.2
     }
 
     try:
-        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers, method='POST')
-        with urllib.request.urlopen(req, timeout=18) as response:
+        json_data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+        req = urllib.request.Request(url, data=json_data, headers=headers, method='POST')
+        
+        with urllib.request.urlopen(req, timeout=20) as response:
             res_data = json.loads(response.read().decode('utf-8'))
-            polished = res_data['choices'][0]['message']['content'].strip()
-            return polished
-    except Exception:
-        return text
+            translated_result = res_data['choices'][0]['message']['content'].strip()
+            return translated_result
+            
+    except urllib.error.HTTPError as he:
+        err_body = he.read().decode('utf-8')
+        return f"⚠️ API HTTP Error ({he.code}): {err_body}"
+    except Exception as e:
+        return f"⚠️ Translation Connection Error: {str(e)}"
