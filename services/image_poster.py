@@ -17,11 +17,11 @@ def get_sticker_symbol(sticker_choice, text=""):
     
     if sticker_choice == "🪄 AI మ్యాజిక్ (Auto Select)":
         clean_t = text.lower()
-        if any(k in clean_t for k in ["రక్తం", "రక్తదాన", "సేవ", "ఆసుపత్రి", "బ్లడ్", "శిబిరం"]):
+        if any(k in clean_t for k in ["రక్తం", "రక్తదాన", "సేవ", "ఆసుపత్రి", "బ్లడ్", "శిబిరం", "रक्तदान"]):
             return "🩸"
-        elif any(k in clean_t for k in ["ఓం", "శాంతి", "ధ్యానం", "భగవాన్", "ఆత్మ", "ఆధ్యాత్మిక"]):
+        elif any(k in clean_t for k in ["ఓం", "శాంతి", "ధ్యానం", "భగవాన్", "ఆత్మ", "ఆధ్యాత్మిక", "ॐ"]):
             return "🕉️"
-        elif any(k in clean_t for k in ["శాంతి", "ప్రశాంతత", "ప్రేమ"]):
+        elif any(k in clean_t for k in ["శాంతి", "ప్రశాంతత", "ప్రేమ", "peace"]):
             return "🕊️"
         elif any(k in clean_t for k in ["విజయం", "శుభాకాంక్షలు", "అభినందనలు"]):
             return "🌟"
@@ -86,7 +86,7 @@ def generate_ai_poster_html(
     else:
         top_sticker_display = custom_img_html
 
-    # పూర్తి మ్యాటర్ vs AI సారాంశం లాజిక్
+    # పూర్తి మ్యాటర్ vs AI సారాంశం
     if "పూర్తి మ్యాటర్" in content_mode:
         paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
         body_content_html = "".join([f"<p style='margin-bottom: 12px; line-height: 1.7;'>{p}</p>" for p in paragraphs])
@@ -99,16 +99,20 @@ def generate_ai_poster_html(
 3. "footer_quote": Ending blessing.
 STRICT JSON ONLY: {"title": "...", "highlights": ["...", "..."], "footer_quote": "..."}"""
         url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+        headers = {
+            "Authorization": f"Bearer {groq_key.strip()}",
+            "Content-Type": "application/json; charset=utf-8",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
         payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.1-8b-instant",
             "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": text}],
             "temperature": 0.2,
             "response_format": {"type": "json_object"}
         }
         try:
-            req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers=headers, method='POST')
-            with urllib.request.urlopen(req, timeout=12) as response:
+            req = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode('utf-8'), headers=headers, method='POST')
+            with urllib.request.urlopen(req, timeout=15) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
                 parsed = json.loads(res_data['choices'][0]['message']['content'])
                 title_text = parsed.get("title", "ముఖ్యాంశాలు")
