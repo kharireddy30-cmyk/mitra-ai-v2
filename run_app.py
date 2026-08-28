@@ -9,6 +9,10 @@ def resolve_path(path):
         resolved_path = os.path.abspath(path)
     return resolved_path
 
+# FFmpeg ను సిస్టమ్ పాత్‌కి అనుసంధానించడం
+base_dir = getattr(sys, "_MEIPASS", os.path.abspath("."))
+os.environ["PATH"] += os.pathsep + base_dir
+
 if __name__ == "__main__":
     app_path = resolve_path("app.py")
     sys.argv = [
