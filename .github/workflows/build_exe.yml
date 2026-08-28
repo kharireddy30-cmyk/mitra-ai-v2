@@ -20,12 +20,12 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pyinstaller pillow
+        pip install pyinstaller
 
     - name: Build Windows EXE with PyInstaller
       shell: cmd
       run: |
-        pyinstaller --noconfirm --onedir --windowed --icon=app_icon.ico --add-data "services;services" --add-data "app.py;." --add-data "bgm.mp3;." --copy-metadata streamlit --collect-all streamlit --collect-all streamlit_mic_recorder --name "Brahma_AI_Studio" run_app.py
+        pyinstaller --noconfirm --onedir --windowed --icon=speech_icon.ico --add-data "services;services" --add-data "app.py;." --add-data "bgm.mp3;." --copy-metadata streamlit --collect-all streamlit --collect-all streamlit_mic_recorder --name "Brahma_AI_Studio" run_app.py
 
     - name: Compress Build to ZIP
       shell: pwsh
