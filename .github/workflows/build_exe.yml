@@ -26,7 +26,7 @@ jobs:
       run: |
         python create_icon.py
 
-    - name: Build Windows EXE with PyInstaller
+    - name: Build Windows EXE
       shell: cmd
       run: |
         pyinstaller --noconfirm --onedir --windowed --icon=app_icon.ico --add-data "services;services" --add-data "app.py;." --add-data "bgm.mp3;." --copy-metadata streamlit --collect-all streamlit --hidden-import=streamlit --hidden-import=edge_tts --hidden-import=speech_recognition --hidden-import=pydub --name "Brahma_AI_Studio" run_app.py
