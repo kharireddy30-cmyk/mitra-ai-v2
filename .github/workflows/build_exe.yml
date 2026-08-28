@@ -22,10 +22,19 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
+    - name: Download FFmpeg for Audio Processing
+      shell: pwsh
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile ffmpeg.zip
+        Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg_temp
+        $binPath = (Get-ChildItem -Path "ffmpeg_temp" -Filter "bin" -Recurse).FullName
+        Copy-Item "$binPath\ffmpeg.exe" -Destination "."
+        Copy-Item "$binPath\ffprobe.exe" -Destination "."
+
     - name: Build Windows EXE with PyInstaller
       shell: cmd
       run: |
-        pyinstaller --noconfirm --onedir --windowed --icon=speech_icon.ico --add-data "services;services" --add-data "app.py;." --add-data "bgm.mp3;." --copy-metadata streamlit --collect-all streamlit --collect-all edge_tts --collect-all streamlit_mic_recorder --collect-all speech_recognition --collect-all pydub --collect-all docx --collect-all PIL --name "Brahma_AI_Studio" run_app.py
+        pyinstaller --noconfirm --onedir --windowed --icon=speech_icon.ico --add-binary "ffmpeg.exe;." --add-binary "ffprobe.exe;." --add-data "services;services" --add-data "app.py;." --add-data "bgm.mp3;." --copy-metadata streamlit --collect-all streamlit --collect-all edge_tts --collect-all streamlit_mic_recorder --collect-all speech_recognition --collect-all pydub --collect-all docx --collect-all PIL --name "Brahma_AI_Studio" run_app.py
 
     - name: Compress Build to ZIP
       shell: pwsh
