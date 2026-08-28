@@ -25,7 +25,7 @@ jobs:
     - name: Build Windows EXE with PyInstaller
       shell: cmd
       run: |
-        pyinstaller --noconfirm --onedir --windowed --icon=speech_icon.ico --add-data "services;services" --add-data "app.py;." --add-data "bgm.mp3;." --copy-metadata streamlit --collect-all streamlit --collect-all streamlit_mic_recorder --name "Brahma_AI_Studio" run_app.py
+        pyinstaller --noconfirm --onedir --windowed --icon=speech_icon.ico --add-data "services;services" --add-data "app.py;." --add-data "bgm.mp3;." --copy-metadata streamlit --collect-all streamlit --collect-all edge_tts --collect-all streamlit_mic_recorder --collect-all speech_recognition --collect-all pydub --collect-all docx --collect-all PIL --name "Brahma_AI_Studio" run_app.py
 
     - name: Compress Build to ZIP
       shell: pwsh
