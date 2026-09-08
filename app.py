@@ -1,14 +1,31 @@
-import static_ffmpeg
-static_ffmpeg.add_paths()
+import os
+import sys
+import shutil
+
+# 1. FFmpeg & FFprobe కాన్ఫిగరేషన్ (వార్నింగ్స్ లేకుండా pydub కి బైండింగ్)
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+except Exception:
+    pass
+
+ffmpeg_bin = shutil.which("ffmpeg")
+ffprobe_bin = shutil.which("ffprobe")
+
+from pydub import AudioSegment
+from pydub.effects import normalize, compress_dynamic_range
+
+if ffmpeg_bin:
+    AudioSegment.converter = ffmpeg_bin
+if ffprobe_bin:
+    AudioSegment.ffprobe = ffprobe_bin
+
 import streamlit as st
 import edge_tts
-from pydub import AudioSegment
-from pydub.effects import normalize, compress_dynamic_range, high_pass_filter, low_pass_filter
 import speech_recognition as sr
 import asyncio
 import io
 import re
-import os
 import gc
 import traceback
 from datetime import datetime
@@ -91,8 +108,8 @@ def detect_chunk_language(text):
 
 def apply_audio_dsp(audio_segment: AudioSegment) -> AudioSegment:
     try:
-        processed = high_pass_filter(audio_segment, cutoff=300)
-        processed = low_pass_filter(processed, cutoff=3800)
+        processed = audio_segment.high_pass_filter(300)
+        processed = processed.low_pass_filter(3800)
         processed = compress_dynamic_range(processed, threshold=-20.0, ratio=4.0, attack=5.0, release=50.0)
         processed = normalize(processed) + 6.0
         return processed
@@ -244,7 +261,6 @@ with st.expander("⚙️ AI CONTROLS, STICKERS & CANVAS SETTINGS", expanded=Fals
             ]
         )
 
-    # మ్యాన్యువల్ పోస్టర్ లేఅవుట్ ఆప్షన్లు
     col_mode, col_align, col_fsize = st.columns(3)
     with col_mode:
         content_mode = st.selectbox("📝 కంటెంట్ మోడ్:", options=["📜 పూర్తి మ్యాటర్ (Full Exact Text)", "🤖 AI సారాంశం (Summary Points)"])
@@ -399,11 +415,11 @@ with b2:
                     active_text, 
                     theme=poster_theme, 
                     sticker_choice=sticker_choice, 
-                    content_mode=content_mode,
-                    text_align=text_align,
-                    font_size_choice=font_size_choice,
-                    custom_sticker_file=custom_sticker_file,
-                    custom_bg_file=custom_bg_file,
+                    content_mode=content_mode, 
+                    text_align=text_align, 
+                    font_size_choice=font_size_choice, 
+                    custom_sticker_file=custom_sticker_file, 
+                    custom_bg_file=custom_bg_file, 
                     user_prompt=custom_ai_note
                 )
                 st.session_state.poster_html_data = poster_html
@@ -493,8 +509,10 @@ if convert_btn:
                         chosen_voice = voice_dict["te"]
                     elif "Hindi" in tts_lang:
                         chosen_voice = voice_dict["hi"]
-                    else:
+                    elif "English" in tts_lang:
                         chosen_voice = voice_dict["en"]
+                    else:
+                        chosen_voice = voice_dict["hi"]
 
                     temp_file = f"temp_tts_{i}.mp3"
                     try:
@@ -545,8 +563,8 @@ if st.session_state.audio_bytes_data is not None:
         label="📥 DOWNLOAD MP3", 
         data=st.session_state.audio_bytes_data, 
         file_name="speech_audio.mp3", 
-        mime="audio/mp3",
-        key="download_btn",
+        mime="audio/mp3", 
+        key="download_btn", 
         use_container_width=True
     )
 
