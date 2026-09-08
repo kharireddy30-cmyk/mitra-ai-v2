@@ -6,7 +6,6 @@ supabase>=2.4.0
 requests>=2.31.0
 openai>=1.20.0
 pydub>=0.25.1
-static-ffmpeg>=2.5
 edge-tts>=6.1.10
 python-docx>=1.1.0
 pypdf>=4.2.0
