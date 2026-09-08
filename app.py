@@ -2,13 +2,6 @@ import os
 import sys
 import shutil
 
-# 1. FFmpeg & FFprobe కాన్ఫిగరేషన్ (వార్నింగ్స్ లేకుండా pydub కి బైండింగ్)
-try:
-    import static_ffmpeg
-    static_ffmpeg.add_paths()
-except Exception:
-    pass
-
 ffmpeg_bin = shutil.which("ffmpeg")
 ffprobe_bin = shutil.which("ffprobe")
 
@@ -19,7 +12,6 @@ if ffmpeg_bin:
     AudioSegment.converter = ffmpeg_bin
 if ffprobe_bin:
     AudioSegment.ffprobe = ffprobe_bin
-
 import streamlit as st
 import edge_tts
 import speech_recognition as sr
