@@ -1,3 +1,5 @@
+import static_ffmpeg
+static_ffmpeg.add_paths()
 import streamlit as st
 import edge_tts
 from pydub import AudioSegment
