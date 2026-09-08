@@ -1,6 +1,6 @@
 streamlit
 google-generativeai
-gTTS
+gtts
 streamlit-mic-recorder
 supabase
 requests
@@ -10,5 +10,5 @@ edge-tts
 python-docx
 pypdf
 deep-translator
-SpeechRecognition
+speechrecognition
 groq
